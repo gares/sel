@@ -36,13 +36,16 @@ Dispatching is not automatic, it's your `handle_event` that does it.
   let echo : top_event event =
     on_line Unix.stdin (function
       | Ok s -> Echo s
-      | Error _ -> Echo "error")
+      | Error _ -> exit 1)
     |> uncancellable
     |> make_recurrent
       
+  let inject_other_events l =
+    List.map (map (fun x -> NotForMe x)) l
+      
   let handle_event = function
     | NotForMe e ->
-        List.map (map (fun x -> NotForMe x)) (Component.handle_event e)
+        Component.handle_event e |> inject_other_events
     | Echo text ->
         Printf.eprintf "echo: %s\n" text;
         []        
@@ -52,8 +55,7 @@ In the example the current module is in charge of the `Echo` event, and passes
 the ball to `OtherComponent` to handle its events. The `echo` value generates
 an `Echo` event as soon as one line is readable from `Unix.stdin`. The `Echo`
 constructor has to carry all the data that is needed in order to handle that
-event, in this case it is just a string. Handling an event can schedule new
-events for later, for example handling `Echo` schedules another identical event.
+event, in this case it is just a string.
 
 ```ocaml
    let main () =
