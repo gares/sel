@@ -86,7 +86,7 @@ fairness (which you don't get via threads nor Lwt) and you can actually
 events that are ready, so if the user sends a stop request you can look if both
 `Stop` and `ContinueSplitComputation` are in the `ready` list and take action.
 Nor threads nor Lwt have a good story about cancellation, not to talk about
-a `Sys.Break` exception being raise where you don't expect it.
+a `Sys.Break` exception being raised where you don't expect it.
 
 SEL is just some sugar atop `Unix.select` and is a single `.ml` file with no C
 code.
@@ -100,7 +100,7 @@ SEL is released under the terms of the MIT license.
 
 This library is the result of our experience in using threads and the Lwt async
 monad to tame the problem of writing a server which has to listen and react to
-multiple sources of events.
+multiple sources of events. Here why the alternatives did not work for us.
 
 #### Threads
 
