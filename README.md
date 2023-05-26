@@ -18,9 +18,9 @@ later on.
 
 ```ocaml
   let rec loop evs =
-    let ready, waiting = Sel.wait evs in
-    let new_evs_l = List.map handle_event ready in
-    loop (waiting @ List.concat new_evs_l)
+    let ready, evs = pop evs in
+    let new_evs = handle_event ready in
+    loop (enqueue evs new_evs)
 ```
 
 Like a monad, the types force you to thread the list of new events back to
@@ -29,26 +29,23 @@ Like a monad, the types force you to thread the list of new events back to
 Dispatching is not automatic, it's your `handle_event` that does it.
 
 ```ocaml
-  type event =
-    | NotForMe of OtherComponent.event
+  type top_event =
+    | NotForMe of Component.event
     | Echo of string
-    | EchoError
 
-  let echo : event Sel.event =
-    Sel.on_line Unix.stdin (function
-    | Ok s -> Echo s
-    | Error _ -> EchoError)
-
+  let echo : top_event event =
+    on_line Unix.stdin (function
+      | Ok s -> Echo s
+      | Error _ -> Echo "error")
+    |> uncancellable
+    |> make_recurrent
+      
   let handle_event = function
     | NotForMe e ->
-        OtherComponent.handle_event e |>
-        List.map (Sel.map (fun x -> NotForMe x))
+        List.map (map (fun x -> NotForMe x)) (Component.handle_event e)
     | Echo text ->
-        Printf.printf "echo: %s\n" text;
-        [echo]
-    | EchoError ->
-        Printf.eprintf "oops\n";
-        exit 1
+        Printf.eprintf "echo: %s\n" text;
+        []        
 ```
 
 In the example the current module is in charge of the `Echo` event, and passes
@@ -59,8 +56,8 @@ event, in this case it is just a string. Handling an event can schedule new
 events for later, for example handling `Echo` schedules another identical event.
 
 ```ocaml
-let main () =
-  loop [echo; ...]
+   let main () =
+     loop (enqueue empty [echo; ...])
 ```
 
 That is all, for the good and the bad. One has to write some boring code, like
