@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Simple event library - No asymc monads, No threads, No exceptions *)
+(** Simple event library - No async monads, No threads, No exceptions *)
 
 type 'a event
 type 'a res = ('a,exn) result
