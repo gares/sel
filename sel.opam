@@ -11,6 +11,10 @@ bug-reports: "https://github.com/gares/sel/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.6"}
+  "ppx_deriving"
+  "ppx_sexp_conv" {with-test}
+  "ppx_inline_test" {with-test}
+  "ppx_assert" {with-test}
   "odoc" {with-doc}
 ]
 build: [
