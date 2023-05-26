@@ -49,7 +49,7 @@ val uncancellable : 'a event * cancellation_handle -> 'a event
    event constructor does not return the cancellation handle. Here the way
    to recover it *)
 val cancellation_handle : 'e event -> cancellation_handle
-(** lower integers correspond to hight priorities (as in Unix nice) *)
+(** lower integers correspond to high priorities (as in Unix nice) *)
 val set_priority : int -> 'a event -> 'a event
 
 (** The main loop goes like this
