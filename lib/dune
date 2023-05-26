@@ -1,0 +1,6 @@
+(library
+ (name sel)
+ (libraries unix)
+ (preprocess (pps ppx_deriving.std))
+ (modules sel)
+ (public_name sel))
