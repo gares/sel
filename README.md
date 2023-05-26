@@ -23,8 +23,8 @@ later on.
     loop (Sel.enqueue evs new_evs)
 ```
 
-Like a monad, the types force you to thread the list of new events back to
-`Sel.wait` but there is no other "viral" effect.
+Like in a monad, the types invite you to thread the list of new events back to
+`Sel.wait` but there is no other viral effect.
 
 Dispatching is not automatic, it's your `handle_event` that does it.
 
@@ -52,7 +52,7 @@ Dispatching is not automatic, it's your `handle_event` that does it.
 ```
 
 In the example the current module is in charge of the `Echo` event, and passes
-the ball to `OtherComponent` to handle its events. The `echo` value generates
+the ball to `Component` to handle its events. The `echo` value generates
 an `Echo` event as soon as one line is readable from `Unix.stdin`. The `Echo`
 constructor has to carry all the data that is needed in order to handle that
 event, in this case it is just a string.
@@ -75,7 +75,7 @@ handled.
 
 Blocking calls are not forced to go trough SEL. You can read and write freely
 while handling an event. It is up to you to avoid long or blocking computations
-and to preserve some fairness. You can artificially split a computation in
+and to preserve some fairness. You can artificially split a long computation in
 steps and pass the ball to the scheduler by creating event with `Sel.now`,
 which `Sel.wait` will find to be immediately ready *together* with all the
 other events that happen to be ready.
