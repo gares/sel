@@ -46,7 +46,7 @@ val make_recurring : 'a event -> 'a event
 (** convenience adaptor to drop the cancellation handle *)
 val uncancellable : 'a event * cancellation_handle -> 'a event
 (** it is unusual to make a regular computation cancellable, hence the
-   event constructor does not recurn the cancellation handle. Here the way
+   event constructor does not return the cancellation handle. Here the way
    to recover it *)
 val cancellation_handle : 'e event -> cancellation_handle
 (** lower integers correspond to hight priorities (as in Unix nice) *)
