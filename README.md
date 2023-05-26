@@ -4,42 +4,7 @@ This library is the result of our experience in using threads and the Lwt async
 monad to tame the problem of writing a server which has to listen and react to
 multiple sources of events.
 
-The problem comes from the fact that reading from an event source is blocking.
-
-### Threads
-
-Threads help you with that because you can have multiple threads, one per event
-source. Our experience with OCaml threads is that their scheduling is not fair,
-so one thread doing some computations can prevent the others from advancing.
-Calling sleep here and there to recover fairness was sad. We also faced
-a few bugs, some solved by now, where a thread would not wake up even if some
-data was available in  its event source. Threads are nice since the context in
-which a thread is paused is saved for you, you can suspend in the middle of a
-complex piece of code very easily, actually it's transparent, you have to do
-nothing to be suspended (at least in theory, barring an unfair scheduler).
-OCaml threads do not run in parallel as of now. Moreover our target
-application, Coq, has a lot of global state, so threads can anyway only be used
-to deal with blocking reads, not to gain much performance. Or at least, not
-without doing a lot of work.
-Threads are part of OCaml's standard distribution, no external dependency.
-
-### Lwt
-
-The Lwt monad forces you to chop your code in thunks, continuations, you pass
-to a quite extensive API taking care of scheduling and calling continuations
-when the data is actually ready. Monads are "viral", you have to push the monad
-all over the place if you want to take advantage of of Lwt.
-Lwt is also a bit viral, it wants to take over many things behind the scenes.
-For example we had troubles using `fork`. Reasoning about Lwt is supposed to be
-simple, but soon it is not. Yes, you can predict when things run, but then you
-start to have detached promises and some of the "randomness" threads have
-appears again.
-Lwt is well maintained, but it is an external dependency with C code you may
-not want to maintain yourself if things go south. After a while our code started
-to use less and less Lwt features, at some point we even dropped promises.
-What was left was a loop around a single wait, hence SEL.
-
-### SEL
+### SEL's approach
 
 SEL is the old boring loop around `Unix.select`. Yes, it is not trendy.
 
@@ -131,3 +96,45 @@ code.
 
 SEL was written by Enrico Tassi for the VSCoq 2 language server.
 SEL is released under the terms of the MIT license.
+
+### Why SEL?
+
+This library is the result of our experience in using threads and the Lwt async
+monad to tame the problem of writing a server which has to listen and react to
+multiple sources of events.
+
+#### Threads
+
+Threads help you with that because you can have multiple threads, one per event
+source. Our experience with OCaml threads is that their scheduling is not fair,
+so one thread doing some computations can prevent the others from advancing.
+Calling sleep here and there to recover fairness was sad.
+
+We also faced
+a few bugs, some solved by now, where a thread would not wake up even if some
+data was available in  its event source. Threads are nice since the context in
+which a thread is paused is saved for you, you can suspend in the middle of a
+complex piece of code very easily, actually it's transparent, you have to do
+nothing to be suspended (at least in theory, barring an unfair scheduler).
+OCaml threads do not run in parallel as of now. Moreover our target
+application, Coq, has a lot of global state, so threads can anyway only be used
+to deal with blocking reads, not to gain much performance. Or at least, not
+without doing a lot of work.
+Threads are part of OCaml's standard distribution, no external dependency.
+
+#### Lwt
+
+The Lwt monad forces you to chop your code in thunks, continuations, you pass
+to a quite extensive API taking care of scheduling and calling continuations
+when the data is actually ready. Monads are "viral", you have to push the monad
+all over the place if you want to take advantage of of Lwt.
+
+Lwt is also a bit viral, it wants to take over many things behind the scenes.
+For example we had troubles using `fork`. Reasoning about Lwt is supposed to be
+simple, but soon it is not. Yes, you can predict when things run, but then you
+start to have detached promises and some of the "randomness" threads have
+appears again.
+Lwt is well maintained, but it is an external dependency with C code you may
+not want to maintain yourself if things go south. After a while our code started
+to use less and less Lwt features, at some point we even dropped promises.
+What was left was a loop around a single wait, hence SEL.
