@@ -97,6 +97,8 @@ val pop_opt : 'a todo -> 'a option * 'a todo
 
 val pop_timeout : stop_after_being_idle_for:float -> 'a todo -> 'a option * 'a todo
 
+(** Waits until some event is ready. The three lists are, respectively
+    system events, synchronization events, regular computations *) 
 val wait : 'a todo -> 'a list * 'a list * 'a list * 'a todo
 val wait_timeout : stop_after_being_idle_for:float -> 'a todo -> 'a list * 'a list * 'a list * 'a todo
 
