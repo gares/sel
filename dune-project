@@ -17,7 +17,12 @@
  (name sel)
  (synopsis "Simple Event Library")
  (description "Some sugar atop Unix.select")
- (depends ocaml dune)
+ (depends
+  ocaml
+  dune
+  ppx_deriving
+  (ppx_sexp_conv :with-test)
+  (ppx_inline_test :with-test)
+  (ppx_assert :with-test))
  (tags
   (event input output)))
-  

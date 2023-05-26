@@ -1,0 +1,28 @@
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  opam:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        ocaml-compiler: [4.14.x]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Use OCaml ${{ matrix.ocaml-compiler }}
+      uses: avsm/setup-ocaml@v2
+      with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+    - name: Install SEL
+      env:
+        OPAMYES: true
+      run: |
+        opam pin add sel.dev . --with-doc --with-test --verbose
