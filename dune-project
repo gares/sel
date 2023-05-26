@@ -11,7 +11,7 @@
 
 (maintainers "Enrico Tassi")
 
-(license LICENSE)
+(license MIT)
 
 (package
  (name sel)

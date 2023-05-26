@@ -4,7 +4,7 @@ synopsis: "Simple Event Library"
 description: "Some sugar atop Unix.select"
 maintainer: ["Enrico Tassi"]
 authors: ["Enrico Tassi"]
-license: "LICENSE"
+license: "MIT"
 tags: ["event" "input" "output"]
 homepage: "https://github.com/gares/sel"
 bug-reports: "https://github.com/gares/sel/issues"
