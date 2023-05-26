@@ -18,9 +18,9 @@ later on.
 
 ```ocaml
   let rec loop evs =
-    let ready, evs = pop evs in
+    let ready, evs = Sel.pop evs in
     let new_evs = handle_event ready in
-    loop (enqueue evs new_evs)
+    loop (Sel.enqueue evs new_evs)
 ```
 
 Like a monad, the types force you to thread the list of new events back to
@@ -33,15 +33,15 @@ Dispatching is not automatic, it's your `handle_event` that does it.
     | NotForMe of Component.event
     | Echo of string
 
-  let echo : top_event event =
-    on_line Unix.stdin (function
+  let echo : top_event Sel.event =
+    Sel.on_line Unix.stdin (function
       | Ok s -> Echo s
       | Error _ -> exit 1)
     |> uncancellable
     |> make_recurrent
       
   let inject_other_events l =
-    List.map (map (fun x -> NotForMe x)) l
+    List.map (Sel.map (fun x -> NotForMe x)) l
       
   let handle_event = function
     | NotForMe e ->
@@ -59,7 +59,7 @@ event, in this case it is just a string.
 
 ```ocaml
    let main () =
-     loop (enqueue empty [echo; ...])
+     loop (Sel.enqueue Sel.empty [echo; ...])
 ```
 
 That is all, for the good and the bad. One has to write some boring code, like
