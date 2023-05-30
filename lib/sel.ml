@@ -288,11 +288,9 @@ module Sorted : sig
   val length : 'a list -> int
   val filter : ('a -> bool) -> 'a list -> 'a list
   val for_all : ('a -> bool) -> 'a list -> bool
-  val map_to_list : ('a -> 'b) -> 'a list -> 'b List.t
   val append : 'a list -> 'a list -> 'a list
   val concat3 : ('a -> int) -> 'a List.t -> 'a List.t -> 'a list -> 'a list
   val sort : ('a -> int) -> 'a List.t -> 'a list
-  val min : 'a list -> int
   val pp_list : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a list -> unit
 
 end = struct
@@ -315,8 +313,6 @@ end = struct
 
   let for_all f l = List.for_all (on_fst f) l
 
-  let min = function [] -> max_int | (_,p) :: _ -> p
-
   let look = function
     | [] -> Nil
     | (x,p) :: xs -> Cons(x,p,xs)
@@ -328,8 +324,6 @@ end = struct
   let cons_opt = function
     | Some(x,p) -> cons x p
     | None -> fun x -> x
-
-  let map_to_list f l = List.map (on_fst f) l
 
   let cmp (_,p1) (_,p2) = p1 - p2
 
@@ -367,7 +361,7 @@ let size todo =
   let { system; queue; tasks; ready } = prune_cancelled todo in
   List.(length system + length queue + Sorted.length tasks + Sorted.length ready )
 
-let nothing_left_to_do todo =
+let is_empty todo =
   let { system; queue; tasks; ready } = prune_cancelled todo in
   system = [] && queue = [] && tasks = Sorted.nil && ready = Sorted.nil
 
@@ -389,10 +383,10 @@ let rec wait_for_system_or_queue_events ~deadline (fds,sys) queue =
     if ready_sys <> [] || ready_queue <> [] then ready_sys, ready_queue, waiting_sys, waiting_queue, min min_prio_queue min_prio_sys
     else wait_for_system_or_queue_events ~deadline (fds,waiting_sys) queue
 
-let wait_return_sorted (l1,l2,l3,todo) =
+let wait_return_sorted (l1,l2,o3,todo) =
   priority_sort l1 |> List.map (fun x -> x.it),
   priority_sort l2 |> List.map (fun x -> x.it),
-  l3 |> Sorted.map_to_list (fun x -> x.it),
+  (Option.map (fun (x,_) -> x.it) o3),
   todo
 
 let cons_recurring_sorted e p l =
@@ -409,28 +403,29 @@ let pull_ready_sorted min_prio l =
 
 let wait ?(deadline=max_float) todo =
   let { system; queue; tasks; ready } as todo = prune_cancelled todo in
-  if nothing_left_to_do todo then
-    [], [], Sorted.nil, todo
+  assert(ready = Sorted.nil); (* mixing with pop *)
+  if is_empty todo then
+    [], [], None, todo
   else
     let ready_sys, waiting_sys, min_prio_sys = check_for_system_events system in
     let ready_queue, waiting_queue, min_prio_queue = check_for_queue_events queue in
-    if ready = Sorted.nil && tasks = Sorted.nil && ready_queue = [] && ready_sys = [] then
+    if tasks = Sorted.nil && ready_queue = [] && ready_sys = [] then
       let fds = map_filter (function { it = ReadInProgress(fd,_); _ } -> Some fd | _ -> None) waiting_sys in
       let ready_sys, ready_queue, waiting_sys, waiting_queue, _ =
         wait_for_system_or_queue_events ~deadline (fds,waiting_sys) waiting_queue in
-      ready_sys, ready_queue, Sorted.nil,
+      ready_sys, ready_queue, None,
       { system = waiting_sys; queue = waiting_queue; tasks = Sorted.nil; ready = Sorted.nil }
     else
       let min_prio = min min_prio_sys min_prio_queue in
-      let min_prio = min min_prio (Sorted.min ready) in
       let ready_task, waiting_tasks = pull_ready_sorted min_prio tasks in
-      ready_sys, ready_queue, Sorted.cons_opt ready_task ready,
+      ready_sys, ready_queue, ready_task,
       { system = waiting_sys; queue = waiting_queue; tasks = waiting_tasks; ready = Sorted.nil }
 
 
 let pop_return (ready_sys,ready_queue,ready_task, todo) =
   let ready_sys = List.map cast_to_not_recurring ready_sys in
   let ready_queue = List.map cast_to_not_recurring ready_queue in
+  let ready_task = Sorted.cons_opt ready_task Sorted.nil in
   let ready = Sorted.concat3 (fun x -> x.priority) ready_sys ready_queue ready_task in
   match Sorted.look ready with
   | Sorted.Cons(x,_,ready) -> Some x.it, { todo with ready }

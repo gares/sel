@@ -21,11 +21,11 @@ open Sel
 let wait_timeout todo =
   let ready, todo = pop_timeout ~stop_after_being_idle_for:0.1 todo in
   [%test_eq: bool] (Option.is_none ready) true;
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   ready, todo
 
 (* match a string list against a rex list, useful for errors *)
-let rec osmatch r s =
+let osmatch r s =
   match s with
   | None -> false
   | Some s -> Str.string_match (Str.regexp r) s 0
@@ -59,7 +59,7 @@ let read_leftover read n =
 let%test_unit "sel.wait.empty" =
   let ready, todo = pop_opt empty in
   [%test_eq: bool] (Option.is_none ready) true;
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
 ;;
 
 (* tasks are returned according to their priority *)
@@ -73,7 +73,7 @@ let %test_unit "sel.wait.prio" =
   [%test_eq: int option] ready (Some 1);
   let ready, todo = pop_opt todo in
   [%test_eq: int option] ready (Some 2);
-  let ready, todo = pop_opt todo in
+  let ready, _todo = pop_opt todo in
   [%test_eq: int option] ready (Some 3);
 ;;
 
@@ -85,16 +85,16 @@ let %test_unit "sel.wait.recurring" =
   (* 1 and 2, are ready; 2 stays there *)
   let ready, todo = pop_opt todo in
   [%test_eq: int option] ready (Some 1);
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: bool] (only_recurring_events todo) true;
   let ready, todo = pop_opt todo in
   [%test_eq: int option] ready (Some 2);
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: bool] (only_recurring_events todo) true;
   (* 2 still there *)
   let ready, todo = pop_opt todo in
   [%test_eq: int option] ready (Some 2);
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: bool] (only_recurring_events todo) true;
 ;;
 
@@ -105,11 +105,11 @@ let %test_unit "sel.wait.recurring.starvation" =
   let todo = enqueue empty [e1;e2] in
   (* 1 and 2, are ready; 2 stays there *)
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: bool] (only_recurring_events todo) false;
   [%test_eq: int option] ready (Some 1);
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: int option] ready (Some 1);
   (* pp_todo (fun fmt i -> Format.fprintf fmt "%d" i) Format.std_formatter todo; *)
   [%test_eq: bool] (only_recurring_events todo) false;
@@ -135,14 +135,14 @@ let %test_unit "sel.event.bytes" =
   let read, write = pipe () in
   let todo = enqueue empty [fst @@ on_bytes read 3 b2s] in
   (* nothing to read *)
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   (* something to read but not enough *)
   write "1";
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   (* more than enough *)
   write "234";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
   [%test_eq: string option] ready (Some "123");
   (* extra byte is not lost *)
   [%test_eq: string] (read_leftover read 1) "4";
@@ -156,7 +156,7 @@ let %test_unit "sel.event.bytes.recurring" =
 let ready, todo = pop_opt todo in
   [%test_eq: string option] ready (Some "123");
   write "456";
-  let ready, todo = pop_opt todo in
+  let ready, _todo = pop_opt todo in
   [%test_eq: string option] ready (Some "456");
 ;;
 
@@ -165,12 +165,12 @@ let%test_unit "sel.event.queue" =
   let q = Stdlib.Queue.create () in
   let todo = enqueue empty [on_queue q (fun () -> ()) |> uncancellable] in
   (* no progress since the queue is empty *)
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   (* progress since the queue has a token *)
   Stdlib.Queue.push () q;
   let ready, todo = pop_opt todo in
   [%test_eq: bool] (Option.is_none ready) false;
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
 ;;
 
 (* queue2 does not advance unless both queues are pushed *)
@@ -180,24 +180,24 @@ let%test_unit "sel.event.queue2" =
   let todo = enqueue empty [on_queues q1 q2 (fun () () -> ()) |> uncancellable] in
   Stdlib.Queue.push () q1;
   (* no progress since one queue is empty *)
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   Stdlib.Queue.push () q2;
   (* progress since both queues have a token *)
   let ready, todo = pop_opt todo in
   [%test_eq: bool] (Option.is_none ready) false;
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
 ;;
 
 (* line event waits for \n and does not eat more chars *)
 let %test_unit "sel.event.line" =
   let read, write = pipe () in
   let todo = enqueue empty [on_line read s2s |> uncancellable] in
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   write "123";
-  let ready, todo = wait_timeout todo in
+  let _ready, todo = wait_timeout todo in
   write "\naa";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
   [%test_eq: string option] ready (Some "123");
   [%test_eq: string] (read_leftover read 2) "aa";
 ;;
@@ -208,11 +208,11 @@ let %test_unit "sel.event.line.recurring" =
   let todo = enqueue empty [on_line read s2s |> uncancellable |> make_recurring] in
   write "123\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "123");
   write "456\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "456");
 ;;
 
@@ -221,7 +221,7 @@ let %test_unit "sel.event.http_cle" =
   let todo = enqueue empty [on_httpcle read b2s |> uncancellable ] in
   write "content-Length: 4\n\n1\n3.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) true;
+  [%test_eq: bool] (is_empty todo) true;
   [%test_eq: string option] ready (Some "1\n3.");
 ;;
 
@@ -230,11 +230,11 @@ let %test_unit "sel.event.http_cle.recurring" =
   let todo = enqueue empty [on_httpcle read b2s |> uncancellable |> make_recurring] in
   write "content-Length: 4\n\n1\n3.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "1\n3.");
   write "content-Length: 4\n\n4\n6.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 
@@ -243,15 +243,15 @@ let %test_unit "sel.event.http_cle.recurring.err" =
   let todo = enqueue empty [on_httpcle read b2s |> uncancellable |> make_recurring] in
   write "content-Length: \n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "End_of_file");
   write "a\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: bool] (osmatch ".*Scan_failure.*" ready) true;
   write "content-Length: 4\n\n4\n6.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (nothing_left_to_do todo) false;
+  [%test_eq: bool] (is_empty todo) false;
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 

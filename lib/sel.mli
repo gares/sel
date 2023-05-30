@@ -82,24 +82,53 @@ val set_priority : int -> 'a event -> 'a event
 
  *)
 
+(** The set of events we can wait for *)
 type 'a todo
-val pp_todo : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a todo -> unit
 
+(** The empty todo set *)
 val empty : 'a todo
-val size : 'a todo -> int
-val enqueue : 'a todo -> 'a event list -> 'a todo
-val nothing_left_to_do : 'a todo -> bool
+
+(** Check if the todo set is empty *)
+val is_empty : 'a todo -> bool
+
+(** In presence of recurring events the todo set is never empty *)
 val only_recurring_events : 'a todo -> bool
 
-(** raises Failure if there is nothing left to do *)
+(* Debugging *)
+val pp_todo : (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a todo -> unit
+val size : 'a todo -> int
+
+(** Adds a list of events, the order (among events with the same priority)
+   is preserved *)
+val enqueue : 'a todo -> 'a event list -> 'a todo
+
+(** Wait for one event. If more are ready, return the one with higher priority.
+    raises Failure if there is nothing left to do *)
 val pop : 'a todo -> 'a * 'a todo
+
+(** Same as [pop] but retuning an option *)
 val pop_opt : 'a todo -> 'a option * 'a todo
 
-val pop_timeout : stop_after_being_idle_for:float -> 'a todo -> 'a option * 'a todo
+(** Same as [pop_opt] but retuning an [None] if no event is ready
+    in [stop_after_being_idle_for] seconds. Precision is about a tenth of
+    a second. *)
+val pop_timeout : stop_after_being_idle_for:float ->
+  'a todo -> 'a option * 'a todo
 
 (** Waits until some event is ready. The three lists are, respectively
-    system events, synchronization events, regular computations *) 
-val wait : 'a todo -> 'a list * 'a list * 'a list * 'a todo
-val wait_timeout : stop_after_being_idle_for:float -> 'a todo -> 'a list * 'a list * 'a list * 'a todo
+    system events, synchronization events, and other events.
+    All system and synchronization events which are ready are returned,
+    and are sorted according to the priority (higher priority first).
+    A computation is considered only if it has higher priority than any
+    other event which is ready.
+    
+    This API cannot be mixed with [pop], use one or the other.
+    *) 
+val wait : 'a todo -> 'a list * 'a list * 'a option * 'a todo
 
-
+(* Same as [wait] but returns empty lists if no event is ready
+    in [stop_after_being_idle_for] seconds. Precision is about a tenth of
+    a second. *)
+val wait_timeout : stop_after_being_idle_for:float ->
+  'a todo -> 'a list * 'a list * 'a option * 'a todo
