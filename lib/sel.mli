@@ -39,10 +39,10 @@
     let rec loop evs =
       let ready, evs = pop evs in
       let new_evs = handle_event ready in
-      loop (enqueue evs new_evs)
+      loop (Todo.add evs new_evs)
 
     let main () =
-      loop (Todo.enqueue Todo.empty [echo; ...])
+      loop (Todo.add Todo.empty [echo; ...])
 
     ]}
 
