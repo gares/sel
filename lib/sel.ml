@@ -56,8 +56,9 @@ let pp_queue_event _ fmt = function
 
 type 'a task_event = 'a [@@deriving show]
 
+module Event = struct
+
 type cancellation_handle = bool ref [@@deriving show]
-let cancel x = x := true
 
 type ('a,'b) with_attributes = {
   name : string option ;
@@ -70,22 +71,15 @@ type ('a,'b) with_attributes = {
 
 let cmp_priority { priority = t1; _} { priority = t2; _} = t1 - t2
 
-let name name it = { it with name = Some name }
-let make_recurring x = { x with recurring = true }
-let set_priority priority x = { x with priority }
-let is_recurring { recurring; _ } = recurring <> None
-let uncancellable (e,_) = e
-let cancellation_handle { cancelled; _ } = cancelled
-
 let make_event it =
   let cancelled = ref false in
-  { name = None; recurring = false; priority = 0; cancelled; it }, cancelled
+  { name = None; recurring = false; priority = 0; cancelled; it }
 
 type 'a event_ =
   | SystemEvent of 'a system_event
   | QueueEvent of 'a queue_event
   | Task of 'a task_event
-type 'a event = (bool,'a event_) with_attributes
+  [@@deriving show]
 
 let map_system_event f = function
   | WaitProcess(pid,k) -> WaitProcess(pid, (fun x -> f (k x)))
@@ -105,7 +99,23 @@ let map f = function
   | SystemEvent e -> SystemEvent (map_system_event f e)
   | QueueEvent e -> QueueEvent(map_queue_event f e)
 
+      
+type 'a t = (bool,'a event_) with_attributes
+[@@deriving show]
+  
 let map f e = map_with_attributes (map f) e
+
+let name name it = { it with name = Some name }
+let recurring x = { x with recurring = true }
+let is_recurring { recurring; _ } = recurring <> None
+let at_priority priority x = { x with priority }
+
+let get_cancellation_handle { cancelled; _ } = cancelled
+let cancel x = x := true
+
+end
+
+open Event
 
 type ('a,'b) has_finished =
   | Yes of 'a
@@ -116,31 +126,32 @@ let mkReadInProgress fd = function
   | FNil x -> Yes x
 
 let one_line () = Line (Bytes.make 1 '0', Buffer.create 40)
-let bytes n ?(buff=Bytes.create n) () = Bytes(n,buff)
+let some_bytes n ?(buff=Bytes.create n) () = Bytes(n,buff)
 
-let on_line fd k : 'a event * cancellation_handle =
+module On = struct
+
+  type 'a res = ('a,exn) result
+
+let line fd k : 'a Event.t =
   make_event @@ SystemEvent (ReadInProgress(fd, one_line () -- finish_with k))
 
-let on_bytes fd n k : 'a event * cancellation_handle =
-  make_event @@ SystemEvent (ReadInProgress(fd, bytes n () -- finish_with k))
+let bytes fd n k : 'a Event.t =
+  make_event @@ SystemEvent (ReadInProgress(fd, some_bytes n () -- finish_with k))
 
-let now task : 'a event =
-  make_event @@ Task task |> uncancellable
-
-let on_death_of ~pid k : 'a event * cancellation_handle =
+let death_of ~pid k : 'a Event.t =
   make_event @@ SystemEvent (WaitProcess(pid,k))
 
-let ocaml_value (k : 'a res -> 'b) : 'b fcomp =
+let an_ocaml_value (k : 'a res -> 'b) : 'b fcomp =
   let (--?) x y = err k x y in
-  bytes Marshal.header_size ()
+  some_bytes Marshal.header_size ()
   --? (fun buff -> let data_size = Marshal.data_size buff 0 in
-  bytes data_size ~buff:(Bytes.extend buff 0 data_size) ()
+  some_bytes data_size ~buff:(Bytes.extend buff 0 data_size) ()
   --? (fun buff -> let value = Marshal.from_bytes buff 0 in
   finish_with k (Ok value)))
 ;;
 
-let on_ocaml_value fd k : 'a event * cancellation_handle =
-  make_event @@ SystemEvent (ReadInProgress(fd, ocaml_value k))
+let ocaml_value fd k : 'a Event.t =
+  make_event @@ SystemEvent (ReadInProgress(fd, an_ocaml_value k))
 
 let parse_content_length_or err k s =
   try
@@ -150,24 +161,29 @@ let parse_content_length_or err k s =
     (Scanf.Scan_failure _ | Failure _ | End_of_file | Invalid_argument _) as e ->
       err (Error e)
 
-let httpcle (k : Bytes.t res -> 'b) : 'b fcomp  =
+let an_httpcle (k : Bytes.t res -> 'b) : 'b fcomp  =
   let (--?) x y = err k x y in
   one_line ()
   --? (parse_content_length_or (finish_with k) (fun length ->
   one_line ()
   --? (fun _discard ->
-  bytes length ()
+  some_bytes length ()
   --? (fun buff ->
   finish_with k (Ok buff)))))
 
-let on_httpcle fd k : 'a event * cancellation_handle =
-  make_event @@ SystemEvent (ReadInProgress(fd, httpcle k))
+let httpcle fd k : 'a Event.t =
+  make_event @@ SystemEvent (ReadInProgress(fd, an_httpcle k))
 
-let on_queue q1 k : 'a event * cancellation_handle =
+let queue q1 k : 'a Event.t =
   make_event @@ QueueEvent (WaitQueue1(q1,k))
 
-let on_queues q1 q2 k : 'a event * cancellation_handle =
+let queues q1 q2 k : 'a Event.t =
   make_event @@ QueueEvent (WaitQueue2(q1,q2,k))
+
+end
+
+let now task : 'a Event.t =
+  make_event @@ Task task
 
 let cons_recurring e l =
   match e.recurring with
@@ -339,7 +355,9 @@ end
 
 let priority_sort l = List.stable_sort cmp_priority l
 
-type 'a todo = {
+module Todo = struct
+
+type 'a t = {
   system : ('a system_event option,'a system_event) with_attributes list;
   queue  : ('a queue_event option,'a queue_event)  with_attributes list;
   tasks  : ('a task_event option,'a task_event)   with_attributes Sorted.list;
@@ -365,13 +383,24 @@ let is_empty todo =
   let { system; queue; tasks; ready } = prune_cancelled todo in
   system = [] && queue = [] && tasks = Sorted.nil && ready = Sorted.nil
 
+let add { system; queue; tasks; ready } l =
+  let new_sys, new_queue, new_tasks = partition_events l in
+  { 
+    system = system @ new_sys;
+    queue = queue @ new_queue;
+    tasks = Sorted.append tasks (Sorted.sort (fun x -> x.priority) new_tasks);
+    ready;
+  }
+
 let only_recurring_events todo =
   let { system; queue; tasks; ready } = prune_cancelled todo in
   List.for_all is_recurring system &&
   List.for_all is_recurring queue &&
   Sorted.for_all is_recurring tasks &&
   ready = Sorted.nil
-
+  
+end
+  
 (* This is blocking wait (modulo a deadline). We check for system events
    (io, process death) or a queue (in case some thread puts a token there). *)
 let rec wait_for_system_or_queue_events ~deadline (fds,sys) queue =
@@ -402,6 +431,7 @@ let pull_ready_sorted min_prio l =
   | Sorted.Cons(x,p,l) -> Some(x,p), cons_recurring_sorted x p l
 
 let wait ?(deadline=max_float) todo =
+  let open Todo in
   let { system; queue; tasks; ready } as todo = prune_cancelled todo in
   assert(ready = Sorted.nil); (* mixing with pop *)
   if is_empty todo then
@@ -423,6 +453,7 @@ let wait ?(deadline=max_float) todo =
 
 
 let pop_return (ready_sys,ready_queue,ready_task, todo) =
+  let open Todo in
   let ready_sys = List.map cast_to_not_recurring ready_sys in
   let ready_queue = List.map cast_to_not_recurring ready_queue in
   let ready_task = Sorted.cons_opt ready_task Sorted.nil in
@@ -446,12 +477,3 @@ let wait_timeout ~stop_after_being_idle_for:delta l =
   wait_return_sorted @@ wait ~deadline l
 
 let wait l = wait_return_sorted @@ wait l
-
-let enqueue { system; queue; tasks; ready } l =
-  let new_sys, new_queue, new_tasks = partition_events l in
-  { 
-    system = system @ new_sys;
-    queue = queue @ new_queue;
-    tasks = Sorted.append tasks (Sorted.sort (fun x -> x.priority) new_tasks);
-    ready;
-  }
