@@ -91,9 +91,10 @@ a `Sys.Break` exception being raised where you don't expect it.
 SEL is just some sugar atop `Unix.select` and is a single `.ml` file with no C
 code.
 
-#### Authors
+#### Trivia
 
-SEL was written by Enrico Tassi for the VSCoq 2 language server.
+SEL was written by Enrico Tassi for the [VSCoq 2 language-server](https://github.com/coq-community/vscoq).
+SEL is both an acronym and [a joke](https://en.wikipedia.org/wiki/Salting_a_bird%27s_tail).
 SEL is released under the terms of the MIT license.
 
 ### Why SEL?
