@@ -66,7 +66,7 @@ That is all, for the good and the bad. One has to write some boring code, like
 injecting the events of the other component into the `NotForMe` event, so that
 dispatching can pass the ball correctly.
 
-SEL provides a few `Sel.on_*` APIs to create events on which one can wait.
+SEL provides a few `Sel.On.*` APIs to create events on which one can wait.
 For example the death of a process, or an HTTP Content-Length encoded request,
 or some item in a Queue, or some marhaled OCaml value.
 All these APIs take a function to inject the actual data that comes with the
