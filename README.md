@@ -20,7 +20,7 @@ later on.
   let rec loop evs =
     let ready, evs = Sel.pop evs in
     let new_evs = handle_event ready in
-    loop (Sel.enqueue evs new_evs)
+    loop (Sel.Todo.add evs new_evs)
 ```
 
 Like in a monad, the types invite you to thread the list of new events back to
@@ -33,19 +33,19 @@ Dispatching is not automatic, it's your `handle_event` that does it.
     | NotForMe of Component.event
     | Echo of string
 
-  let echo : top_event Sel.event =
-    Sel.on_line Unix.stdin (function
+  let echo : top_event Sel.Event.t =
+    Sel.On.line Unix.stdin (function
       | Ok s -> Echo s
       | Error _ -> exit 1)
-    |> uncancellable
-    |> make_recurrent
+    |> Sel.Event.recurrent
       
   let inject_other_events l =
-    List.map (Sel.map (fun x -> NotForMe x)) l
+    List.map (Sel.Event.map (fun x -> NotForMe x)) l
       
   let handle_event = function
     | NotForMe e ->
-        Component.handle_event e |> inject_other_events
+        Component.handle_event e |>
+        inject_other_events
     | Echo text ->
         Printf.eprintf "echo: %s\n" text;
         []        
@@ -59,7 +59,7 @@ event, in this case it is just a string.
 
 ```ocaml
    let main () =
-     loop (Sel.enqueue Sel.empty [echo; ...])
+     loop (Sel.Todo.add Sel.Todo.empty [echo; ...])
 ```
 
 That is all, for the good and the bad. One has to write some boring code, like
@@ -91,9 +91,10 @@ a `Sys.Break` exception being raised where you don't expect it.
 SEL is just some sugar atop `Unix.select` and is a single `.ml` file with no C
 code.
 
-#### Authors
+#### Trivia
 
-SEL was written by Enrico Tassi for the VSCoq 2 language server.
+SEL was written by Enrico Tassi for the [VSCoq 2 language-server](https://github.com/coq-community/vscoq).
+SEL is both an acronym and [a joke](https://en.wikipedia.org/wiki/Salting_a_bird%27s_tail).
 SEL is released under the terms of the MIT license.
 
 ### Why SEL?
