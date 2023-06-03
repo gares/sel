@@ -18,7 +18,7 @@
  (synopsis "Simple Event Library")
  (description "Some sugar atop Unix.select")
  (depends
-  (ocaml (>= 4.07))
+  (ocaml (>= 4.08))
   dune
   ppx_deriving
   (ppx_sexp_conv :with-test)
