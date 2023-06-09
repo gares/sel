@@ -2,5 +2,5 @@
  (name sel)
  (libraries unix)
  (preprocess (pps ppx_deriving.std))
- (modules sel)
+ (modules sel events sorted)
  (public_name sel))

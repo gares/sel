@@ -26,7 +26,6 @@
       On.line Unix.stdin (function
         | Ok s -> Echo s
         | Error _ -> Echo "error")
-      |> Event.recurring
 
     let handle_event = function
       | NotForMe e ->
@@ -34,10 +33,10 @@
           List.map (Event.map (fun x -> NotForMe x))
       | Echo text ->
           Printf.eprintf "echo: %s\n" text;
-          []
+          [echo]
 
     let rec loop evs =
-      let ready, evs = pop evs in
+      let ready, evs = Todo.pop evs in
       let new_evs = handle_event ready in
       loop (Todo.add evs new_evs)
 
@@ -60,16 +59,6 @@
   (** inject an event into another one *)
   val map : ('a -> 'b) -> 'a t -> 'b t
 
-  (** for debug printing *)
-  val name : string -> 'a t -> 'a t
-
-  (** a recurrent event is never removed from the todo set, that is, when
-      ready a copy of it is added back automatically *)
-  val recurring : 'a t -> 'a t
-
-  (** lower integers correspond to high priorities (as in Unix nice) *)
-  val at_priority : int -> 'a t -> 'a t
-
   type cancellation_handle
 
   (** in order to cancel an event, one has to store its cancellation handle *)
@@ -80,32 +69,43 @@
 
 end
 
-(** Events one can wait for (read data, pull from queues, ...) *)
+(** Events one can wait for (read data, pull from queues, ...)
+    - [name] for debug printing
+    - [priority] lower integers correspond to high priorities (as in Unix nice),
+      default is 0
+*)
 module On : sig
 
   type 'a res = ('a,exn) result
 
   (** a line, terminated by ['\n'] *)
-  val line : Unix.file_descr -> (string res -> 'a) -> 'a Event.t
+  val line : ?priority:int -> ?name:string ->
+    Unix.file_descr -> (string res -> 'a) -> 'a Event.t
 
   (** bytes *)
-  val bytes : Unix.file_descr -> int -> (Bytes.t res -> 'a) -> 'a Event.t
+  val bytes :  ?priority:int -> ?name:string ->
+    Unix.file_descr -> int -> (Bytes.t res -> 'a) -> 'a Event.t
 
   (** termination of a process *)
-  val death_of : pid:int -> (Unix.process_status -> 'a) -> 'a Event.t
+  val death_of : ?priority:int -> ?name:string ->
+    pid:int -> (Unix.process_status -> 'a) -> 'a Event.t
 
   (** any value (not type safe, uses [Marshall]) *)
-  val ocaml_value : Unix.file_descr -> ('b res -> 'a) -> 'a Event.t
+  val ocaml_value : ?priority:int -> ?name:string ->
+    Unix.file_descr -> ('b res -> 'a) -> 'a Event.t
 
   (** HTTP Content Length encoded data *)
-  val httpcle : Unix.file_descr -> (Bytes.t res -> 'a) -> 'a Event.t
+  val httpcle : ?priority:int -> ?name:string ->
+    Unix.file_descr -> (Bytes.t res -> 'a) -> 'a Event.t
 
   (** Synchronization events between two components (e.g. a worker pool and a
       task queue) and an event (e.g. starting a worker) *)
-  val queues : 'b Queue.t -> 'c Queue.t -> ('b -> 'c -> 'a) -> 'a Event.t
+  val queues : ?priority:int -> ?name:string ->
+    'b Queue.t -> 'c Queue.t -> ('b -> 'c -> 'a) -> 'a Event.t
 
   (** Synchronization events between a component and an event *)
-  val queue : 'b Queue.t -> ('b -> 'a) -> 'a Event.t
+  val queue : ?priority:int -> ?name:string ->
+    'b Queue.t -> ('b -> 'a) -> 'a Event.t
 
 end
 
@@ -134,7 +134,7 @@ end
     ]}
 
 *)
-val now : 'a -> 'a Event.t
+val now : ?priority:int -> ?name:string -> 'a -> 'a Event.t
 
 (** Set of events being waited for *)
 module Todo : sig
@@ -147,9 +147,6 @@ module Todo : sig
 
   (** check if the todo set is empty *)
   val is_empty : 'a t -> bool
-
-  (** in presence of recurring events the todo set is never empty *)
-  val only_recurring_events : 'a t -> bool
 
   (** pretty printer *)
   val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
@@ -184,12 +181,11 @@ val pop_timeout : stop_after_being_idle_for:float ->
     A computation is considered only if it has higher priority than any
     other event which is ready.
     
-    This API cannot be mixed with {!val:pop}, use one or the other.
     *) 
-val wait : 'a Todo.t -> 'a list * 'a list * 'a option * 'a Todo.t
+val wait : 'a Todo.t -> 'a list * 'a Todo.t
 
 (** Same as {!val:wait} but returns empty lists if no event is ready
     in [stop_after_being_idle_for] seconds. Precision is about a tenth of
     a second. *)
 val wait_timeout : stop_after_being_idle_for:float ->
-  'a Todo.t -> 'a list * 'a list * 'a option * 'a Todo.t
+  'a Todo.t -> 'a list * 'a Todo.t
