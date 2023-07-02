@@ -87,8 +87,7 @@ events that are ready, so if the user sends a stop request you can look if both
 Nor threads nor Lwt have a good story about cancellation, not to talk about
 a `Sys.Break` exception being raised where you don't expect it.
 
-SEL is just some sugar atop `Unix.select` and is a single `.ml` file with no C
-code.
+SEL is just some sugar atop `Unix.select`.
 
 #### Trivia
 
