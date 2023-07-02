@@ -230,4 +230,24 @@ let %test_unit "sel.event.http_cle.recurring.err" =
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 
+
+let %test_unit "sel.event.now.order" =
+  let e1 = now ~priority:1 1 in
+  let e2 = now ~priority:1 2 in
+  let e3 = now ~priority:2 3 in
+  let e4 = now ~priority:2 4 in
+  let q = Caml.Queue.create () in
+  Caml.Queue.add 0 q;
+  let x = On.queue ~priority:1 q (fun x -> x) in
+  let todo = Todo.add Todo.empty [x;e1;e3] in
+  let todo = Todo.add todo [e2;e4] in
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [0;1;2];
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [3;4];
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  let ready, _ = wait todo in
+  [%test_eq: int list] ready [];
+;;  
+
   

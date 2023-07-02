@@ -173,15 +173,8 @@ val pop_opt : 'a Todo.t -> 'a option * 'a Todo.t
 val pop_timeout : stop_after_being_idle_for:float ->
   'a Todo.t -> 'a option * 'a Todo.t
 
-(** waits until some event is ready. The three lists are, respectively
-    system events, synchronization events (see {!val:On.queue} and {!val:On.queues}),
-    and other events (see {!val:now}).
-    All system and synchronization events which are ready are returned,
-    and are sorted according to the priority (higher priority first).
-    A computation is considered only if it has higher priority than any
-    other event which is ready.
-    
-    *) 
+(** waits until some event is ready. All ready events with the lowest priority
+    are returned. *) 
 val wait : 'a Todo.t -> 'a list * 'a Todo.t
 
 (** Same as {!val:wait} but returns empty lists if no event is ready

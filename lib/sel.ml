@@ -143,10 +143,12 @@ let wait_for_system_or_queue_events ~deadline sys queue =
   let fds = file_descriptors_of sys in
   wait_for_system_or_queue_events ~deadline (fds,sys) queue
 
-let pull_task min_prio l =
+let rec pull_tasks min_prio l =
   match Sorted.look l with
   | Sorted.Nil -> Sorted.nil, Sorted.nil
-  | Sorted.Cons((x,p),l) when Sorted.le_user p min_prio -> Sorted.cons x p Sorted.nil, l
+  | Sorted.Cons((x,p),l) when Sorted.le_user p min_prio ->
+      let tasks, l = pull_tasks min_prio l in
+      Sorted.cons x p tasks, l
   | _ -> Sorted.nil, l
   
 (* Keep only events with a user priority equal to the given one (assumed to be the minimum) *)
@@ -179,12 +181,12 @@ let wait ?(deadline=max_float) todo : 'a WithAttributes.t list * 'a Todo.t =
       let min_prio, ready = Sorted.min ready in
       let min_prio = Sorted.min_priority min_prio min_prio_sys in
       let min_prio = Sorted.min_priority min_prio min_prio_queue in
-      let ready_task, tasks = pull_task min_prio tasks in
+      let ready_tasks, tasks = pull_tasks min_prio tasks in
       let ready_sys, postponed_sys = postpone min_prio ready_sys in
       let ready_queue, postponed_queue = postpone min_prio ready_queue in
       let ready, postponed_ready = postpone min_prio ready in
       let postponed = Sorted.concat [postponed_sys; postponed_queue; postponed_ready] in
-      let ready = Sorted.to_list (Sorted.concat [ready_sys; ready_queue; ready_task; ready]) in
+      let ready = Sorted.to_list (Sorted.concat [ready_sys; ready_queue; ready_tasks; ready]) in
       ready, { system = waiting_sys; queue = waiting_queue; tasks; ready = postponed }
 
 let pop_return (ready, todo) =
