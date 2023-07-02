@@ -65,9 +65,9 @@ let%test_unit "sel.wait.empty" =
 (* tasks are returned according to their priority *)
 let %test_unit "sel.wait.prio" =
   let todo = Todo.add Todo.empty [
-    now 3 |> Event.at_priority 3;
-    now 1 |> Event.at_priority 1;
-    now 2 |> Event.at_priority 2
+    now ~priority:3 3;
+    now ~priority:1 1;
+    now ~priority:2 2
     ] in
   let ready, todo = pop_opt todo in
   [%test_eq: int option] ready (Some 1);
@@ -77,58 +77,24 @@ let %test_unit "sel.wait.prio" =
   [%test_eq: int option] ready (Some 3);
 ;;
 
-(* recurring tasks are not lost/consumed *)
-let %test_unit "sel.wait.recurring" =
-  let e1 = now 1 |> Event.at_priority 1 in
-  let e2 = now 2 |> Event.at_priority 2 |> Event.recurring in
-  let todo = Todo.add Todo.empty [e1;e2] in
-  (* 1 and 2, are ready; 2 stays there *)
-  let ready, todo = pop_opt todo in
-  [%test_eq: int option] ready (Some 1);
-  [%test_eq: bool] (Todo.is_empty todo) false;
-  [%test_eq: bool] (Todo.only_recurring_events todo) true;
-  let ready, todo = pop_opt todo in
-  [%test_eq: int option] ready (Some 2);
-  [%test_eq: bool] (Todo.is_empty todo) false;
-  [%test_eq: bool] (Todo.only_recurring_events todo) true;
-  (* 2 still there *)
-  let ready, todo = pop_opt todo in
-  [%test_eq: int option] ready (Some 2);
-  [%test_eq: bool] (Todo.is_empty todo) false;
-  [%test_eq: bool] (Todo.only_recurring_events todo) true;
+(* ready list not empty with pop *)
+let %test_unit "sel.wait.pop" =
+  let e1 = now 1 in
+  let q = Stdlib.Queue.create () in
+  let e2 = On.queue q (fun x -> x) in
+  let e3 = On.queue q (fun x -> x) in
+  Stdlib.Queue.push 2 q;
+  Stdlib.Queue.push 3 q;
+  let todo = Todo.add Todo.empty [e1;e2;e3] in
+  let x, todo = pop_opt todo in
+  let y, todo = pop_opt todo in
+  let z, todo = pop_opt todo in
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  [%test_eq: int option] x (Some 1);
+  [%test_eq: int option] y (Some 2);
+  [%test_eq: int option] z (Some 3);
 ;;
 
-(* recurring tasks can lead to starvation *)
-let %test_unit "sel.wait.recurring.starvation" =
-  let e1 = now 1 |> Event.at_priority 1 |> Event.recurring in
-  let e2 = now 2 |> Event.at_priority 2 in
-  let todo = Todo.add Todo.empty [e1;e2] in
-  (* 1 and 2, are ready; 2 stays there *)
-  let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
-  [%test_eq: bool] (Todo.only_recurring_events todo) false;
-  [%test_eq: int option] ready (Some 1);
-  let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
-  [%test_eq: int option] ready (Some 1);
-  (* pp_todo (fun fmt i -> Format.fprintf fmt "%d" i) Format.std_formatter todo; *)
-  [%test_eq: bool] (Todo.only_recurring_events todo) false;
-;;
-
-(* recurring tasks do not inflate the todo *)
-let %test_unit "sel.wait.recurring.inflation" =
-  let e1 = now 1 |> Event.at_priority 1 |> Event.recurring in
-  let e2 = now 2 |> Event.at_priority 2 |> Event.recurring in
-  let todo = Todo.add Todo.empty [e1;e2] in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  let _, todo = pop_opt todo in
-  [%test_eq: int] (Todo.size todo) 2;
-;;
 
 (* bytes n waits until n bytes are read *)
 let %test_unit "sel.event.bytes" =
@@ -151,10 +117,12 @@ let %test_unit "sel.event.bytes" =
 (* internal buffer is reset *)
 let %test_unit "sel.event.bytes.recurring" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [On.bytes read 3 b2s |> Event.recurring] in
+  let e = On.bytes read 3 b2s in
+  let todo = Todo.add Todo.empty [e] in
   write "123";
 let ready, todo = pop_opt todo in
   [%test_eq: string option] ready (Some "123");
+  let todo = Todo.add todo [e] in
   write "456";
   let ready, _todo = pop_opt todo in
   [%test_eq: string option] ready (Some "456");
@@ -205,14 +173,16 @@ let %test_unit "sel.event.line" =
 (* line internal buffer is not pulluted by previous run *)
 let %test_unit "sel.event.line.recurring" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [On.line read s2s |> Event.recurring] in
+  let e = On.line read s2s in
+  let todo = Todo.add Todo.empty [e] in
   write "123\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "123");
+  let todo = Todo.add todo [e] in
   write "456\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "456");
 ;;
 
@@ -227,32 +197,75 @@ let %test_unit "sel.event.http_cle" =
 
 let %test_unit "sel.event.http_cle.recurring" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [On.httpcle read b2s |> Event.recurring] in
+  let e = On.httpcle read b2s in
+  let todo = Todo.add Todo.empty [e] in
   write "content-Length: 4\n\n1\n3.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "1\n3.");
+  let todo = Todo.add todo [e] in
   write "content-Length: 4\n\n4\n6.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 
 let %test_unit "sel.event.http_cle.recurring.err" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [On.httpcle read b2s |> Event.recurring] in
+  let e = On.httpcle read b2s in
+  let todo = Todo.add Todo.empty [e] in
   write "content-Length: \n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "End_of_file");
+  let todo = Todo.add todo [e] in
   write "a\n";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: bool] (osmatch ".*Scan_failure.*" ready) true;
+  let todo = Todo.add todo [e] in
   write "content-Length: 4\n\n4\n6.";
   let ready, todo = pop_opt todo in
-  [%test_eq: bool] (Todo.is_empty todo) false;
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 
+
+let %test_unit "sel.event.now.order0" =
+  let e1 = now ~priority:1 1 in
+  let e2 = now ~priority:1 2 in
+  let e3 = now ~priority:2 3 in
+  let e4 = now ~priority:2 4 in
+  let q = Caml.Queue.create () in
+  Caml.Queue.add 0 q;
+  let x = On.queue ~priority:1 q (fun x -> x) in
+  let todo = Todo.add Todo.empty [x;e1;e3] in
+  let todo = Todo.add todo [e2;e4] in
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [0;1;2];
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [3;4];
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  let ready, _ = wait todo in
+  [%test_eq: int list] ready [];
+;;  
+
+let %test_unit "sel.event.now.order1" =
+  let e1 = now ~priority:1 1 in
+  let e2 = now ~priority:1 2 in
+  let e3 = now ~priority:2 3 in
+  let e4 = now ~priority:2 4 in
+  let q = Caml.Queue.create () in
+  Caml.Queue.add 0 q;
+  let x = On.queue ~priority:1 q (fun x -> x) in
+  let todo = Todo.add Todo.empty [e1;x;e3] in
+  let todo = Todo.add todo [e2;e4] in
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [1;0;2];
+  let ready, todo = wait todo in
+  [%test_eq: int list] ready [3;4];
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  let ready, _ = wait todo in
+  [%test_eq: int list] ready [];
+;;  
   

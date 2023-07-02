@@ -9,7 +9,7 @@ jobs:
   opam:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         ocaml-compiler: [4.14.x]
     runs-on: ${{ matrix.os }}
     steps:
@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Use OCaml ${{ matrix.ocaml-compiler }}
-      uses: avsm/setup-ocaml@v2
+      uses: ocaml/setup-ocaml@v2
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
