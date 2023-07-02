@@ -37,7 +37,6 @@ Dispatching is not automatic, it's your `handle_event` that does it.
     Sel.On.line Unix.stdin (function
       | Ok s -> Echo s
       | Error _ -> exit 1)
-    |> Sel.Event.recurrent
       
   let inject_other_events l =
     List.map (Sel.Event.map (fun x -> NotForMe x)) l
@@ -48,7 +47,7 @@ Dispatching is not automatic, it's your `handle_event` that does it.
         inject_other_events
     | Echo text ->
         Printf.eprintf "echo: %s\n" text;
-        []        
+        [echo]        
 ```
 
 In the example the current module is in charge of the `Echo` event, and passes
