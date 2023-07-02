@@ -9,7 +9,7 @@ jobs:
   opam:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         ocaml-compiler: [4.14.x]
     runs-on: ${{ matrix.os }}
     steps:

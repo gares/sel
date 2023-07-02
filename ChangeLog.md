@@ -1,8 +1,9 @@
 # v0.3.0 - 02/7/2023
 
 - Major code cleanup and documentation
-- Removal of recurrnt events
+- Removal of recurrent events
 - APIs `pop` and `wait` can now be freely mixed
+- CI on Linux, Windows and MacOS
 
 # v0.2.0 - 31/5/2023
 
