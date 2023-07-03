@@ -1,3 +1,7 @@
+# v0.4.0 - 03/7/2023
+
+- Bugfix in event postponement (API `pop`)
+
 # v0.3.0 - 02/7/2023
 
 - Major code cleanup and documentation
