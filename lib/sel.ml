@@ -153,8 +153,8 @@ let rec pull_tasks min_prio l =
   
 (* Keep only events with a user priority equal to the given one (assumed to be the minimum) *)
 let postpone p ready =
-  let same_user_prio { WithAttributes.priority = q; _} = Sorted.eq_user p q in
-  let ready, postponed = Sorted.partition same_user_prio  ready in
+  let leq_user_prio { WithAttributes.priority = q; _} = Sorted.le_user q p in
+  let ready, postponed = Sorted.partition leq_user_prio ready in
   ready, postponed
         
 let wait ?(deadline=max_float) todo : 'a WithAttributes.t list * 'a Todo.t =
@@ -181,12 +181,12 @@ let wait ?(deadline=max_float) todo : 'a WithAttributes.t list * 'a Todo.t =
       let min_prio, ready = Sorted.min ready in
       let min_prio = Sorted.min_priority min_prio min_prio_sys in
       let min_prio = Sorted.min_priority min_prio min_prio_queue in
+      let ready_old, postponed_ready = pull_tasks min_prio ready in
       let ready_tasks, tasks = pull_tasks min_prio tasks in
       let ready_sys, postponed_sys = postpone min_prio ready_sys in
       let ready_queue, postponed_queue = postpone min_prio ready_queue in
-      let ready, postponed_ready = postpone min_prio ready in
       let postponed = Sorted.concat [postponed_sys; postponed_queue; postponed_ready] in
-      let ready = Sorted.to_list (Sorted.concat [ready_sys; ready_queue; ready_tasks; ready]) in
+      let ready = Sorted.to_list (Sorted.concat [ready_sys; ready_queue; ready_tasks; ready_old]) in
       ready, { system = waiting_sys; queue = waiting_queue; tasks; ready = postponed }
 
 let pop_return (ready, todo) =
