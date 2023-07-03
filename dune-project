@@ -9,14 +9,14 @@
 
 (authors "Enrico Tassi")
 
-(maintainers "Enrico Tassi")
+(maintainers "Enrico Tassi <enrico.tassi@inria.fr>")
 
 (license MIT)
 
 (package
  (name sel)
  (synopsis "Simple Event Library")
- (description "Some sugar atop Unix.select")
+ (description "This library is the result of our experience in using threads and the Lwt async monad to tame the problem of writing a server which has to listen and react to multiple sources of events. The library itself is just sugar atop Unix.select. You can read more about the library on https://github.com/gares/sel")
  (depends
   (ocaml (>= 4.08))
   dune
