@@ -185,20 +185,23 @@ end
 let now ?priority ?name task : 'a Event.t =
   make_event ?priority ?name @@ Task task
   
-let advance_queue _ = function
-  | WaitQueue1(q1,_) as x when Queue.is_empty q1 ->  No x
-  | WaitQueue1(q1,k) -> Yes(k (Queue.pop q1))
-  | WaitQueue2(q1,q2,_) as x when Queue.is_empty q1 || Queue.is_empty q2 -> No x
-  | WaitQueue2(q1,q2,k) -> Yes(k (Queue.pop q1) (Queue.pop q2))
+let advance_queue _ _ = function
+  | WaitQueue1(q1,_) as x when Queue.is_empty q1 -> (), No x
+  | WaitQueue1(q1,k) -> (), Yes(k (Queue.pop q1))
+  | WaitQueue2(q1,q2,_) as x when Queue.is_empty q1 || Queue.is_empty q2 -> (), No x
+  | WaitQueue2(q1,q2,k) -> (), Yes(k (Queue.pop q1) (Queue.pop q2))
 
-let advance_system ~ready_fds _ = function
+let advance_system ready_fds _ = function
   | WaitProcess(pid,k) as x ->
       let rc, code = Unix.waitpid [Unix.WNOHANG] pid in
-      if rc == 0 then No x
-      else Yes (k code)
+      if rc == 0 then ready_fds, No x
+      else ready_fds, Yes (k code)
   | ReadInProgress(_, FNil _) -> assert false
-  | ReadInProgress(fd,_) as x when not (List.mem fd ready_fds) -> No x
-  | ReadInProgress(fd, FCons(Line (buff,acc) as line,rest)) -> begin try
+  | ReadInProgress(fd,_) as x when not (List.mem fd ready_fds) -> ready_fds, No x
+  | ReadInProgress(fd, FCons(Line (buff,acc) as line,rest)) ->
+    let ready_fds = List.filter ((<>) fd) ready_fds in
+    ready_fds,
+    begin try
       let n = Unix.read fd buff 0 1 in
       if n = 0 then begin
         Buffer.clear acc;
@@ -216,8 +219,11 @@ let advance_system ~ready_fds _ = function
       with Unix.Unix_error _ as e ->
         Buffer.clear acc;
         mkReadInProgress fd (rest (Error e))
-      end
-  | ReadInProgress(fd,FCons(Bytes(n,buff),rest)) -> begin try
+    end
+  | ReadInProgress(fd,FCons(Bytes(n,buff),rest)) ->
+    let ready_fds = List.filter ((<>) fd) ready_fds in
+    ready_fds,
+    begin try
       let m = Unix.read fd buff (Bytes.length buff - n) n in
       if m = 0 then
         mkReadInProgress fd (rest (Error End_of_file))
@@ -227,5 +233,5 @@ let advance_system ~ready_fds _ = function
         else
           mkReadInProgress fd (rest (Ok buff))
       with Unix.Unix_error _ as e -> mkReadInProgress fd (rest (Error e))
-      end
+    end
       

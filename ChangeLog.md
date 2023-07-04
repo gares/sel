@@ -1,3 +1,7 @@
+# UNRELEASED
+
+- Resilient to multiple copies of the same event on the same file descriptor
+
 # v0.4.0 - 03/7/2023
 
 - Bugfix in event postponement (API `pop`)

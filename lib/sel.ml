@@ -91,20 +91,20 @@ end
 
 (* Like List.filter but also returns the minimum priority of ready events.
    Moreover ~advance can make the event advance (whilst not being ready yet)*)
-let pull_ready ~advance l =
-  let rec pull_ready yes no min_priority l =
+let pull_ready ~advance st l =
+  let rec pull_ready yes no min_priority st l =
     match Sorted.look l with
     | Sorted.Nil -> yes, no, min_priority
     | Sorted.Cons(({ WithAttributes.it; cancelled; priority; _ } as e, _), rest) ->
-        match advance cancelled it with
-        | Yes y ->
+        match advance st cancelled it with
+        | st, Yes y ->
           let min_priority = min min_priority priority in
           let e = drop_event_type y e in
-          pull_ready (Sorted.cons e e.priority yes) no min_priority rest
-        | No x  ->
-          pull_ready yes (Sorted.cons { e with it = x } e.priority no) min_priority rest 
+          pull_ready (Sorted.cons e e.priority yes) no min_priority st rest
+        | st, No x  ->
+          pull_ready yes (Sorted.cons { e with it = x } e.priority no) min_priority st rest 
   in
-    pull_ready Sorted.nil Sorted.nil Sorted.max_priority l
+    pull_ready Sorted.nil Sorted.nil Sorted.max_priority st l
   
 type ('a,'b) ev_checker =
   'a WithAttributes.t Sorted.t -> 'b WithAttributes.t Sorted.t * 'a WithAttributes.t Sorted.t * Sorted.priority
@@ -119,12 +119,12 @@ let file_descriptors_of l =
 let check_for_system_events : ('a system_event,'a) ev_checker = fun waiting ->
     let fds = file_descriptors_of waiting in
     let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
-    let new_ready, waiting, min_prio  = pull_ready ~advance:(advance_system ~ready_fds) waiting in
+    let new_ready, waiting, min_prio  = pull_ready ~advance:advance_system ready_fds waiting in
     new_ready, waiting, min_prio
   
 let check_for_queue_events : ('a queue_event,'a) ev_checker =
   fun waiting ->
-    let new_ready, waiting, min_prio = pull_ready ~advance:advance_queue waiting in
+    let new_ready, waiting, min_prio = pull_ready ~advance:advance_queue () waiting in
     new_ready, waiting, min_prio  
 
 (* This is blocking wait (modulo a deadline). We check for system events
@@ -133,8 +133,8 @@ let rec wait_for_system_or_queue_events ~deadline (fds,sys) queue =
   if Unix.gettimeofday () > deadline then Sorted.nil, Sorted.nil, sys, queue, Sorted.max_priority
   else
     let ready_fds, _, _ = Unix.select fds [] [] 0.1 in
-    let ready_sys, waiting_sys, min_prio_sys = pull_ready ~advance:(advance_system ~ready_fds) sys in
-    let ready_queue, waiting_queue, min_prio_queue = pull_ready ~advance:advance_queue queue in
+    let ready_sys, waiting_sys, min_prio_sys = pull_ready ~advance:advance_system ready_fds sys in
+    let ready_queue, waiting_queue, min_prio_queue = pull_ready ~advance:advance_queue () queue in
     if ready_sys <> Sorted.nil || ready_queue <> Sorted.nil
     then ready_sys, ready_queue, waiting_sys, waiting_queue, Sorted.min_priority min_prio_queue min_prio_sys
     else wait_for_system_or_queue_events ~deadline (fds,waiting_sys) queue
