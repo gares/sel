@@ -67,7 +67,7 @@ dispatching can pass the ball correctly.
 
 SEL provides a few `Sel.On.*` APIs to create events on which one can wait.
 For example the death of a process, or an HTTP Content-Length encoded request,
-or some item in a Queue, or some marhaled OCaml value.
+or some item in a Queue, or some marshaled OCaml value.
 All these APIs take a function to inject the actual data that comes with the
 event inside the appropriate ADT constructor representing the event ready to be
 handled.
