@@ -116,22 +116,29 @@ let file_descriptors_of l =
    give a shot to system events with 0 wait, otherwise we wait until a
    system event is ready. We never sleep forever, since process death events
    do not wakeup select: we anyway wake up 10 times per second *)
-(* When advancing system events, try advancing all events with lower priority.
-   This way, multiple bytes can be read per file handle, and a system event with
-   low priority won't have to wait for 'n' iterations to read 'n' bytes from the file. *)
-let check_for_system_events : ('a system_event,'a) ev_checker = fun waiting ->
+(* After advancing once, check if any waiting tasks have lower priority (more important) than the lowest
+   ready queue, task or system event. If so, try to advance the system task event.
+   The result is that it when reading 'n' bytes, it is no longer necessary to interleave up to 'n' ready tasks.
+*)
+let check_for_system_events min_prio_task_queue : ('a system_event,'a) ev_checker = fun waiting ->
   let rec check_for_system_events new_ready waiting_skipped min_prio waiting =
+    let waiting, waiting_skipped_1 = Sorted.partition_priority (Sorted.lt_priority min_prio) waiting in
+    let waiting_skipped = Sorted.append waiting_skipped_1 waiting_skipped in
     let fds = file_descriptors_of waiting in
     let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
     if ready_fds = [] then
-      let new_ready_1, waiting_1, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
-      Sorted.append new_ready_1 new_ready, Sorted.append waiting_1 waiting_skipped, Sorted.min_priority min_prio_1 min_prio
+      new_ready, Sorted.append waiting waiting_skipped, min_prio
     else
-      let new_ready_1, waiting_1, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
-      let waiting_1, waiting_1_skipped = Sorted.partition_priority (Sorted.lt_priority min_prio_1) waiting_1 in
-      check_for_system_events (Sorted.append new_ready_1 new_ready) (Sorted.append waiting_1_skipped waiting_skipped) (Sorted.min_priority min_prio_1 min_prio) waiting_1
+      let new_ready_1, waiting, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
+      let new_ready = Sorted.append new_ready_1 new_ready in
+      let min_prio = Sorted.min_priority min_prio min_prio_1 in
+      check_for_system_events new_ready waiting_skipped min_prio waiting
   in
-    check_for_system_events Sorted.nil Sorted.nil Sorted.max_priority waiting
+    let fds = file_descriptors_of waiting in
+    let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
+    let new_ready, waiting, min_prio = pull_ready ~advance:advance_system ready_fds waiting in
+    let min_prio = Sorted.min_priority min_prio_task_queue min_prio in
+    check_for_system_events new_ready Sorted.nil min_prio waiting
 
 let check_for_queue_events : ('a queue_event,'a) ev_checker =
   fun waiting ->
@@ -174,8 +181,10 @@ let wait ?(deadline=max_float) todo : 'a WithAttributes.t list * 'a Todo.t =
   if is_empty todo then
     [], todo
   else
-    let ready_sys, waiting_sys, min_prio_sys = check_for_system_events system in
+    let min_prio, ready = Sorted.min ready in
     let ready_queue, waiting_queue, min_prio_queue = check_for_queue_events queue in
+    let min_prio = Sorted.min_priority min_prio min_prio_queue in
+    let ready_sys, waiting_sys, min_prio_sys = check_for_system_events min_prio system in
     if Sorted.is_nil ready_sys &&
        Sorted.is_nil ready_queue &&
        Sorted.is_nil ready &&
@@ -189,9 +198,7 @@ let wait ?(deadline=max_float) todo : 'a WithAttributes.t list * 'a Todo.t =
       let ready = Sorted.to_list (Sorted.append ready_sys ready_queue) in
       ready, { system = waiting_sys; queue = waiting_queue; tasks; ready = postponed }
     else
-      let min_prio, ready = Sorted.min ready in
       let min_prio = Sorted.min_priority min_prio min_prio_sys in
-      let min_prio = Sorted.min_priority min_prio min_prio_queue in
       let ready_old, postponed_ready = pull_tasks min_prio ready in
       let ready_tasks, tasks = pull_tasks min_prio tasks in
       let ready_sys, postponed_sys = postpone min_prio ready_sys in
