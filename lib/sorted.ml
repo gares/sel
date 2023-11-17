@@ -105,3 +105,13 @@ let partition f { sorted; data } =
   in
     aux [] [] data
 
+let partition_priority f { sorted; data } =
+  let rev = if sorted then List.rev else fun x -> x in
+  let rec aux yes no = function
+    | [] -> { sorted; data = rev yes }, { sorted; data = rev no }
+    | x :: xs ->
+        if f (snd x)
+        then aux (x :: yes) no xs
+        else aux yes (x :: no) xs
+  in
+    aux [] [] data
