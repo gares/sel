@@ -50,3 +50,4 @@ val to_list : 'a t -> 'a list
 val of_list : ('a * priority) list -> 'a t
 val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 val partition : ('a -> bool) -> 'a t -> 'a t * 'a t
+val partition_priority : (priority -> bool) -> 'a t -> 'a t * 'a t

@@ -116,12 +116,23 @@ let file_descriptors_of l =
    give a shot to system events with 0 wait, otherwise we wait until a
    system event is ready. We never sleep forever, since process death events
    do not wakeup select: we anyway wake up 10 times per second *)
+(* When advancing system events, try advancing all events with lower priority.
+   This way, multiple bytes can be read per file handle, and a system event with
+   low priority won't have to wait for 'n' iterations to read 'n' bytes from the file. *)
 let check_for_system_events : ('a system_event,'a) ev_checker = fun waiting ->
+  let rec check_for_system_events new_ready waiting_skipped min_prio waiting =
     let fds = file_descriptors_of waiting in
     let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
-    let new_ready, waiting, min_prio  = pull_ready ~advance:advance_system ready_fds waiting in
-    new_ready, waiting, min_prio
-  
+    if ready_fds = [] then
+      let new_ready_1, waiting_1, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
+      Sorted.append new_ready_1 new_ready, Sorted.append waiting_1 waiting_skipped, Sorted.min_priority min_prio_1 min_prio
+    else
+      let new_ready_1, waiting_1, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
+      let waiting_1, waiting_1_skipped = Sorted.partition_priority (Sorted.lt_priority min_prio_1) waiting_1 in
+      check_for_system_events (Sorted.append new_ready_1 new_ready) (Sorted.append waiting_1_skipped waiting_skipped) (Sorted.min_priority min_prio_1 min_prio) waiting_1
+  in
+    check_for_system_events Sorted.nil Sorted.nil Sorted.max_priority waiting
+
 let check_for_queue_events : ('a queue_event,'a) ev_checker =
   fun waiting ->
     let new_ready, waiting, min_prio = pull_ready ~advance:advance_queue () waiting in
