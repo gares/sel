@@ -112,6 +112,10 @@ type ('a,'b) ev_checker =
 let file_descriptors_of l =
   Sorted.map_filter (function { WithAttributes.it = ReadInProgress(fd,_); _ } -> Some fd | _ -> None) l
 
+let filter_file_descriptor fds = function
+  | { WithAttributes.it = ReadInProgress(fd,_); _ } -> List.mem fd fds
+  | _ -> false
+
 (* For fairness reasons, even if there are immediately ready events we
    give a shot to system events with 0 wait, otherwise we wait until a
    system event is ready. We never sleep forever, since process death events
@@ -122,23 +126,20 @@ let file_descriptors_of l =
 *)
 let check_for_system_events min_prio_task_queue : ('a system_event,'a) ev_checker = fun waiting ->
   let rec check_for_system_events new_ready waiting_skipped min_prio waiting =
-    let waiting, waiting_skipped_1 = Sorted.partition_priority (Sorted.lt_priority min_prio) waiting in
-    let waiting_skipped = Sorted.append waiting_skipped_1 waiting_skipped in
     let fds = file_descriptors_of waiting in
     let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
+    let new_ready_1, waiting, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
+    let new_ready = Sorted.append new_ready_1 new_ready in
+    let min_prio = Sorted.min_priority min_prio_1 min_prio in
     if ready_fds = [] then
       new_ready, Sorted.append waiting waiting_skipped, min_prio
     else
-      let new_ready_1, waiting, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
-      let new_ready = Sorted.append new_ready_1 new_ready in
-      let min_prio = Sorted.min_priority min_prio min_prio_1 in
+      let waiting, waiting_skipped_1 = Sorted.partition (filter_file_descriptor ready_fds) waiting in
+      let waiting, waiting_skipped_2 = Sorted.partition_priority (Sorted.lt_priority min_prio) waiting in
+      let waiting_skipped = Sorted.concat [waiting_skipped_2; waiting_skipped_1; waiting_skipped] in
       check_for_system_events new_ready waiting_skipped min_prio waiting
   in
-    let fds = file_descriptors_of waiting in
-    let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
-    let new_ready, waiting, min_prio = pull_ready ~advance:advance_system ready_fds waiting in
-    let min_prio = Sorted.min_priority min_prio_task_queue min_prio in
-    check_for_system_events new_ready Sorted.nil min_prio waiting
+    check_for_system_events Sorted.nil Sorted.nil min_prio_task_queue waiting
 
 let check_for_queue_events : ('a queue_event,'a) ev_checker =
   fun waiting ->
