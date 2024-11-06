@@ -1,6 +1,7 @@
-# UNRELEASED
+# v0.5.0 - 07/11/2024
 
 - Resilient to multiple copies of the same event on the same file descriptor
+- A system event is given enough rounds to complete if his priority is the lowest
 
 # v0.4.0 - 03/7/2023
 
