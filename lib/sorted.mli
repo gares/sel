@@ -26,6 +26,7 @@ val lt_priority : priority -> priority -> bool
 
 val eq_user : priority -> priority -> bool
 val le_user : priority -> priority -> bool
+val min_user : priority -> priority -> priority
 
 val default_priority : priority
 

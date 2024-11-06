@@ -31,6 +31,8 @@ let lt_priority p1 p2 = cmp_priority p1 p2 < 0
 
 let le_user { user = u1; _} {user = u2; _} = u1 <= u2
 
+let min_priority p1 p2 = if cmp_priority p1 p2 < 0 then p1 else p2
+let min_user p1 p2 = if le_user p1 p2 then p1 else p2
 
 type 'a t = {
   sorted : bool;  

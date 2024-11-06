@@ -98,9 +98,12 @@ let pull_ready ~advance st l =
     | Sorted.Cons(({ WithAttributes.it; cancelled; priority; _ } as e, _), rest) ->
         match advance st cancelled it with
         | st, Yes y ->
-          let min_priority = min min_priority priority in
+          let min_priority = Sorted.min_user min_priority priority in
           let e = drop_event_type y e in
           pull_ready (Sorted.cons e e.priority yes) no min_priority st rest
+        | st, Advanced x  ->
+          let min_priority = Sorted.min_user min_priority priority in
+          pull_ready yes (Sorted.cons { e with it = x } e.priority no) min_priority st rest 
         | st, No x  ->
           pull_ready yes (Sorted.cons { e with it = x } e.priority no) min_priority st rest 
   in
@@ -130,12 +133,12 @@ let check_for_system_events min_prio_task_queue : ('a system_event,'a) ev_checke
     let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
     let new_ready_1, waiting, min_prio_1 = pull_ready ~advance:advance_system ready_fds waiting in
     let new_ready = Sorted.append new_ready_1 new_ready in
-    let min_prio = Sorted.min_priority min_prio_1 min_prio in
+    let min_prio = Sorted.min_user min_prio_1 min_prio in
     if ready_fds = [] then
       new_ready, Sorted.append waiting waiting_skipped, min_prio
     else
       let waiting, waiting_skipped_1 = Sorted.partition (filter_file_descriptor ready_fds) waiting in
-      let waiting, waiting_skipped_2 = Sorted.partition_priority (Sorted.lt_priority min_prio) waiting in
+      let waiting, waiting_skipped_2 = Sorted.partition_priority (Sorted.le_user min_prio) waiting in
       let waiting_skipped = Sorted.concat [waiting_skipped_2; waiting_skipped_1; waiting_skipped] in
       check_for_system_events new_ready waiting_skipped min_prio waiting
   in
