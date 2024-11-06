@@ -120,9 +120,10 @@ open Event
 type ('a,'b) has_finished =
   | Yes of 'a
   | No  of 'b
+  | Advanced of 'b
 
 let mkReadInProgress fd = function
-  | FCons _ as f -> No (ReadInProgress(fd,f))
+  | FCons _ as f -> Advanced (ReadInProgress(fd,f))
   | FNil x -> Yes x
 
 let one_line () = Line (Bytes.make 1 '0', Buffer.create 40)

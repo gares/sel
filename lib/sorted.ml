@@ -31,6 +31,8 @@ let lt_priority p1 p2 = cmp_priority p1 p2 < 0
 
 let le_user { user = u1; _} {user = u2; _} = u1 <= u2
 
+let min_priority p1 p2 = if cmp_priority p1 p2 < 0 then p1 else p2
+let min_user p1 p2 = if le_user p1 p2 then p1 else p2
 
 type 'a t = {
   sorted : bool;  
@@ -105,3 +107,13 @@ let partition f { sorted; data } =
   in
     aux [] [] data
 
+let partition_priority f { sorted; data } =
+  let rev = if sorted then List.rev else fun x -> x in
+  let rec aux yes no = function
+    | [] -> { sorted; data = rev yes }, { sorted; data = rev no }
+    | x :: xs ->
+        if f (snd x)
+        then aux (x :: yes) no xs
+        else aux yes (x :: no) xs
+  in
+    aux [] [] data
