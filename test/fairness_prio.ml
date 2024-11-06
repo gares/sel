@@ -71,3 +71,17 @@ let%test_unit "sel.loop" =
     | Error e -> [%test_eq: string] "" (Stdlib.Printexc.to_string e) in
   loop todo
   
+let%test_unit "sel.loop2" =
+  let read, write = pipe () in
+  let e = On.httpcle ~priority:1 read (fun x -> Result.map ~f:Bytes.to_string x) in
+  write "Content-Length: 3\n\n12";
+  let x = Sel.now ~priority:2 (Ok "bad") in
+  let todo = Todo.add Todo.empty [e;x] in
+  let rec loop todo =
+    let ready, _todo = Sel.pop todo in
+    match ready with
+    | Ok "bad" -> ()
+    | Ok _ -> [%test_eq: string] "" "bad2"
+    | Error e -> [%test_eq: string] "" (Stdlib.Printexc.to_string e) in
+  loop todo
+  
