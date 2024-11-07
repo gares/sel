@@ -222,6 +222,12 @@ let %test_unit "sel.event.http_cle.recurring.err" =
   write "a\n";
   let ready, todo = pop_opt todo in
   [%test_eq: bool] (Todo.is_empty todo) true;
+  (* depending on how eager the event is to read data *)
+  [%test_eq: bool] (osmatch "\\(.*Scan_failure.*\\|End_of_file\\)" ready) true;
+  let todo = Todo.add todo [e] in
+  write "content-Lengtx: 2\n";
+  let ready, todo = pop_opt todo in
+  [%test_eq: bool] (Todo.is_empty todo) true;
   [%test_eq: bool] (osmatch ".*Scan_failure.*" ready) true;
   let todo = Todo.add todo [e] in
   write "content-Length: 4\n\n4\n6.";
