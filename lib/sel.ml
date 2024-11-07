@@ -156,7 +156,7 @@ let rec wait_for_system_or_queue_events ~deadline (fds,sys) queue =
     let ready_fds, _, _ = Unix.select fds [] [] 0.1 in
     let ready_sys, waiting_sys, min_prio_sys = pull_ready ~advance:advance_system ready_fds sys in
     let ready_queue, waiting_queue, min_prio_queue = pull_ready ~advance:advance_queue () queue in
-    if ready_sys <> Sorted.nil || ready_queue <> Sorted.nil
+    if not(Sorted.is_nil ready_sys) || not(Sorted.is_nil ready_queue)
     then
       let min_prio =  Sorted.min_priority min_prio_queue min_prio_sys in
       let new_ready_sys, waiting_sys, min_prio_new_ready_sys = check_for_system_events min_prio waiting_sys in
