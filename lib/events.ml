@@ -16,7 +16,7 @@ type 'a res = ('a,exn) result
 
 (* Events in progress *)
 type _ in_progress =
-  | Line : Bytes.t * Buffer.t -> string in_progress
+  | Line : int * Bytes.t * Buffer.t -> string in_progress
   | Bytes : int * Bytes.t -> Bytes.t in_progress
 
 (* Reified function composition *)
@@ -126,7 +126,7 @@ let mkReadInProgress fd = function
   | FCons _ as f -> Advanced (ReadInProgress(fd,f))
   | FNil x -> Yes x
 
-let one_line () = Line (Bytes.make 1 '0', Buffer.create 40)
+let one_line ?(at_least=1) () = Line (at_least,Bytes.make at_least '0', Buffer.create (max 40 at_least))
 let some_bytes n ?(buff=Bytes.create n) () = Bytes(n,buff)
 
 module On = struct
@@ -161,10 +161,12 @@ let parse_content_length_or err k s =
   with
     (Scanf.Scan_failure _ | Failure _ | End_of_file | Invalid_argument _) as e ->
       err (Error e)
+      
+let len_httpcle_header = String.length "CONTENT-LENGTH: \n"
 
 let an_httpcle (k : Bytes.t res -> 'b) : 'b fcomp  =
   let (--?) x y = err k x y in
-  one_line ()
+  one_line ~at_least:len_httpcle_header ()
   --? (parse_content_length_or (finish_with k) (fun length ->
   one_line ()
   --? (fun _discard ->
@@ -199,19 +201,19 @@ let advance_system ready_fds _ = function
       else ready_fds, Yes (k code)
   | ReadInProgress(_, FNil _) -> assert false
   | ReadInProgress(fd,_) as x when not (List.mem fd ready_fds) -> ready_fds, No x
-  | ReadInProgress(fd, FCons(Line (buff,acc) as line,rest)) ->
+  | ReadInProgress(fd, FCons(Line (m,buff,acc),rest)) ->
     let ready_fds = List.filter ((<>) fd) ready_fds in
     ready_fds,
     begin try
-      let n = Unix.read fd buff 0 1 in
+      let n = Unix.read fd buff 0 m in
       if n = 0 then begin
         Buffer.clear acc;
         mkReadInProgress fd (rest (Error End_of_file))
       end else
-        let c = Bytes.get buff 0 in
+        let c = Bytes.get buff (n-1) in
         if c != '\n' then begin
-          Buffer.add_char acc c; 
-          mkReadInProgress fd (FCons(line,rest))
+          Buffer.add_bytes acc (Bytes.sub buff 0 n); 
+          mkReadInProgress fd (FCons(Line (max (m-n) 1,buff,acc),rest))
         end else begin
           let one_line = Buffer.contents acc in
           Buffer.clear acc;
