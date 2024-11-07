@@ -4,4 +4,6 @@
  (preprocess (pps ppx_deriving.std))
  (modules sel events sorted)
  (private_modules events sorted)
- (public_name sel))
+ (public_name sel)
+ (instrumentation (backend bisect_ppx))
+ )
