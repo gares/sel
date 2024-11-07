@@ -3,4 +3,5 @@
  (libraries base stdio sel str)
  (preprocess
    (pps ppx_sexp_conv ppx_inline_test ppx_assert))
- (inline_tests))
+ (inline_tests)
+ (instrumentation (backend bisect_ppx)))
