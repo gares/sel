@@ -1,7 +1,7 @@
 ## SEL : Simple Event Library
 
 This library is the result of our experience in using threads and the Lwt async
-monad to tame the problem of writing a server which has to listen and react to
+monad to tame the problem of writing a server that has to listen and react to
 multiple sources of events.
 
 ### SEL's approach
@@ -13,7 +13,7 @@ points of computation. With threads it's the OS that does it for you saving the
 stack. With Lwt you write a thunk, a closure, which is not very different.
 With SEL you craft an ADT of the events and the constructors have to carry all
 you need in order to handle that event. Event handlers can generate new events,
-which are put in the pool of events which are eventually ready to be handled
+that are put in the pool of events which are eventually ready to be handled
 later on.
 
 ```ocaml
