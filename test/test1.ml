@@ -141,6 +141,23 @@ let%test_unit "sel.event.queue" =
   [%test_eq: bool] (Todo.is_empty todo) true;
 ;;
 
+(* queue does not run unless something is pushed *)
+let%test_unit "sel.event.queue" =
+  let q = Stdlib.Queue.create () in
+  let todo = Todo.add Todo.empty [On.queue_all q (fun () l -> l)] in
+  (* no progress since the queue is empty *)
+  let _ready, todo = wait_timeout todo in
+  (* progress since the queue has a token *)
+  Stdlib.Queue.push () q;
+  Stdlib.Queue.push () q;
+  Stdlib.Queue.push () q;
+  let ready, todo = pop_opt todo in
+  [%test_eq: bool] (Option.is_none ready) false;
+  [%test_eq: unit list option] ready (Some [();()]);
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  [%test_eq: bool] (Stdlib.Queue.is_empty q) true;
+;;
+
 (* queue2 does not advance unless both queues are pushed *)
 let%test_unit "sel.event.queue2" =
   let q1 = Stdlib.Queue.create () in

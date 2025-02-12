@@ -48,10 +48,12 @@ let pp_system_event _ fmt = function
 
 type 'a queue_event =
   | WaitQueue1 : 'b Queue.t * ('b -> 'a) -> 'a queue_event
+  | WaitQueueBatch1 : 'b Queue.t * ('b -> 'b list -> 'a) -> 'a queue_event
   | WaitQueue2 : 'b Queue.t * 'c Queue.t * ('b -> 'c -> 'a) -> 'a queue_event
 
 let pp_queue_event _ fmt = function
   | WaitQueue1 _ -> Stdlib.Format.fprintf fmt "WaitQueue1"
+  | WaitQueueBatch1 _ -> Stdlib.Format.fprintf fmt "WaitQueueBatch1"
   | WaitQueue2 _ -> Stdlib.Format.fprintf fmt "WaitQueue2"
 
 type 'a task_event = 'a [@@deriving show]
@@ -96,6 +98,7 @@ let map_system_event f = function
   
 let map_queue_event f = function
   | WaitQueue1(q1,k) -> WaitQueue1(q1,(fun x -> f (k x)))
+  | WaitQueueBatch1(q1,k) -> WaitQueueBatch1(q1,(fun x xs -> f (k x xs)))
   | WaitQueue2(q1,q2,k) -> WaitQueue2(q1,q2,(fun x y -> f (k x y)))
 
 let map_task_event f x = f x
@@ -180,6 +183,9 @@ let httpcle ?priority ?name fd k : 'a Event.t =
 let queue ?priority ?name q1 k : 'a Event.t =
   make_event ?priority ?name @@ QueueEvent (WaitQueue1(q1,k))
 
+let queue_all ?priority ?name q1 k : 'a Event.t =
+  make_event ?priority ?name @@ QueueEvent (WaitQueueBatch1(q1,k))
+  
 let queues ?priority ?name q1 q2 k : 'a Event.t =
   make_event?priority ?name  @@ QueueEvent (WaitQueue2(q1,q2,k))
 
@@ -191,6 +197,14 @@ let now ?priority ?name task : 'a Event.t =
 let advance_queue _ _ = function
   | WaitQueue1(q1,_) as x when Queue.is_empty q1 -> (), No x
   | WaitQueue1(q1,k) -> (), Yes(k (Queue.pop q1))
+  | WaitQueueBatch1(q1,_) as x when Queue.is_empty q1 -> (), No x
+  | WaitQueueBatch1(q1,k) ->
+      let hd = Queue.pop q1 in
+      let tl = ref [] in
+      while not @@ Queue.is_empty q1 do
+        tl := Queue.pop q1 :: !tl
+      done;
+       (), Yes(k hd (List.rev !tl))
   | WaitQueue2(q1,q2,_) as x when Queue.is_empty q1 || Queue.is_empty q2 -> (), No x
   | WaitQueue2(q1,q2,k) -> (), Yes(k (Queue.pop q1) (Queue.pop q2))
 

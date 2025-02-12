@@ -10,14 +10,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        ocaml-compiler: [4.14.x]
+        ocaml-compiler: [4.14.x, 5.3.x]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
 
     - name: Use OCaml ${{ matrix.ocaml-compiler }}
-      uses: ocaml/setup-ocaml@v2
+      uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
