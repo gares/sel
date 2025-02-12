@@ -1,3 +1,7 @@
+# UNRELEASED - 07/11/2024
+
+- New API Sel.On.queue_all getting all available queue items
+
 # v0.5.0 - 07/11/2024
 
 - Resilient to multiple copies of the same event on the same file descriptor
