@@ -107,6 +107,11 @@ module On : sig
   val queue : ?priority:int -> ?name:string ->
     'b Queue.t -> ('b -> 'a) -> 'a Event.t
 
+  (** Synchronization events between a component and an event.
+      The queue is emptied, useful to process the contents in batches *)
+  val queue_all : ?priority:int -> ?name:string ->
+    'b Queue.t -> ('b -> 'b list -> 'a) -> 'a Event.t
+
 end
 
 (** mix a regular computations with blocking events. E.g.
