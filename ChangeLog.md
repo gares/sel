@@ -1,4 +1,4 @@
-# UNRELEASED - 07/11/2024
+# v0.6.0 - 12/02/2025
 
 - New API Sel.On.queue_all getting all available queue items
 
