@@ -31,7 +31,7 @@ let pipe () =
   
 (*****************************************************************************)
 
-let %test_unit "sel.event.http_cle" =
+let %test_unit "sel.event.http_cle.perf" =
   let read, write = pipe () in
   let e = On.httpcle read b2s in
   let t0 = Unix.gettimeofday () in
@@ -45,4 +45,24 @@ let %test_unit "sel.event.http_cle" =
   done;
   let t1 = Unix.gettimeofday () in
   Stdlib.Printf.eprintf "time to pop %d httpcle events: %f\n" n (t1 -. t0)
+;;
+let%test_unit "sel.event.promise.perf" =
+  let many = 30_000 in (* Loc of Pfff.v *)
+  let x0 = Unix.gettimeofday () in
+  for i = 1 to many do
+    let p, r = Promise.make () in
+    let todo = Todo.add Todo.empty [On.promise p (fun e -> e)] in
+    (* no progress since one fulfilled *)
+    let t = Thread.create (fun () -> Promise.fulfill r i) () in
+    let ready, todo = pop todo in
+    Thread.join t;
+    let n =
+      match ready with
+      | (Promise.Fulfilled n) -> n
+      | _ -> Int.max_value in
+    [%test_eq: int ] n i;
+    [%test_eq: bool] (Todo.is_empty todo) true;
+  done;
+  let x1 = Unix.gettimeofday () in
+  Stdlib.Printf.eprintf "resolving %d promises: %4.3f\n" many (x1 -. x0);
 ;;

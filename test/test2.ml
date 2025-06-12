@@ -42,7 +42,8 @@ let%test_unit "sel.event.promise.thread2" =
   let p, r = Promise.make () in
   let todo = Todo.add Todo.empty [On.promise p (fun e -> e)] in
   (* no progress since one fulfilled *)
-  let _ready, todo = wait_timeout todo in
+  let ready, todo = wait_timeout todo in
+  [%test_eq: bool] (Option.is_none ready) true;
   let t = Thread.create (fun () -> Promise.fulfill r 7) () in
   let ready, todo = pop_opt todo in
   Thread.join t;
