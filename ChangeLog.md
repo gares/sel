@@ -1,3 +1,7 @@
+# v0.7.0 - 13/06/2025
+
+- New API Sel.On.promise (fullfillment or rejection)
+
 # v0.6.0 - 12/02/2025
 
 - New API Sel.On.queue_all getting all available queue items
