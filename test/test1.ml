@@ -173,6 +173,24 @@ let%test_unit "sel.event.queue2" =
   [%test_eq: bool] (Todo.is_empty todo) true;
 ;;
 
+(* Promise is like q singleton queue *)
+let%test_unit "sel.event.promise" =
+  let p, r = Promise.make () in
+  let todo = Todo.add Todo.empty [On.promise p (fun e -> e)] in
+  (* no progress since one fulfilled *)
+  let _ready, todo = wait_timeout todo in
+  Promise.fulfill r 7;
+  let ready, todo = pop_opt todo in
+  [%test_eq: bool] (Option.is_none ready) false;
+  let n =
+    match ready with
+    | None -> assert false
+    | Some (Promise.Fulfilled n) -> n
+    | Some _ -> Int.max_value in
+  [%test_eq: int ] n 7;
+  [%test_eq: bool] (Todo.is_empty todo) true;
+;;
+
 (* line event waits for \n and does not eat more chars *)
 let %test_unit "sel.event.line" =
   let read, write = pipe () in

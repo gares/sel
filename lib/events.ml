@@ -46,6 +46,45 @@ let pp_system_event _ fmt = function
   | ReadInProgress(_,_) -> Stdlib.Format.fprintf fmt "ReadInProgress"
   | WaitProcess(pid,_) -> Stdlib.Format.fprintf fmt "WaitProcess %d" pid
 
+module Promise = struct
+
+  type 'a state =
+    | Fulfilled of 'a
+    | Rejected of exn [@printer fun fmt e -> Format.fprintf fmt "%s" (Printexc.to_string e)]
+  [@@deriving show]
+
+  type file_descr = Unix.file_descr
+  let pp_file_descr =
+    if Sys.unix then fun fmt i -> Format.fprintf fmt "<fd:%d>" (Obj.magic i)
+    else fun fmt _ -> Format.fprintf fmt "<fd:?>"
+
+  type 'a t = 'a state option ref * file_descr
+  [@@deriving show]
+
+  type 'a handler = 'a t
+
+  let resolved_msg : Bytes.t = Bytes.create 1
+
+  let resolve (p,w) s =
+    if !p = None then (p := Some s; ignore @@ Unix.write w resolved_msg 0 1 ; Unix.close w)
+    else raise @@ Failure "cannot resolve a promise twice"
+
+  let make () : 'a t * 'a handler =
+    let p = ref None in
+    let r, w = Unix.pipe () in
+    (p, r), (p, w)
+  
+  let is_resolved (p,_) = !p <> None
+  let get (p,_) =
+    match !p with
+    | Some x -> x
+    | None -> raise @@ Failure "promise not resolved"
+
+  let fulfill r x = resolve r (Fulfilled x)
+
+  let reject r x = resolve r (Rejected x)
+end
+
 type 'a queue_event =
   | WaitQueue1 : 'b Queue.t * ('b -> 'a) -> 'a queue_event
   | WaitQueueBatch1 : 'b Queue.t * ('b -> 'b list -> 'a) -> 'a queue_event
@@ -188,6 +227,24 @@ let queue_all ?priority ?name q1 k : 'a Event.t =
   
 let queues ?priority ?name q1 q2 k : 'a Event.t =
   make_event?priority ?name  @@ QueueEvent (WaitQueue2(q1,q2,k))
+
+let a_promise_resolution (_,r as p) (k : 'a Promise.state -> 'b) : 'b fcomp =
+  let k_res = function
+    | Ok _ -> Unix.close r;
+        (* if there was no error, the code of Promise.resolve did its job before writing *)
+        assert(Promise.is_resolved p);
+        k (Promise.get p)
+    | Error exn -> Unix.close r;
+        (* Maybe we got signalled, ... or maybe this id dead, hence correct, code  *)
+        if Promise.is_resolved p then k (Promise.get p)
+        else k (Promise.Rejected exn) in
+  let (--?) x y = err k_res x y in
+  some_bytes 1 ~buff:Promise.resolved_msg () (* same buffer we use to read *)
+  --? (fun buff ->
+  finish_with k_res (Ok buff))
+
+let promise ?priority ?name (_,r as p : 'a Promise.t) (k : 'a Promise.state -> 'b) : 'b Event.t =
+  make_event?priority ?name @@ SystemEvent (ReadInProgress(r,a_promise_resolution p k))
 
 end
 

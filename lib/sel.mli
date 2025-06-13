@@ -69,6 +69,41 @@
 
 end
 
+(** Simple promise library for synchronization.
+    There is no critical section support: if two threads run
+       [if not (is_resolved p) then fulfill r]
+    the behavior is undefined.
+    Use only in a 1 producer 1 consumer scenario. *)
+module Promise : sig
+  type 'a state =
+    | Fulfilled of 'a
+    | Rejected of exn
+  val pp_state : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a state -> unit
+
+  type 'a t
+  val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
+  type 'a handler
+  
+  (** [make ()] is a new promise and handler to resolve it. *)
+  val make : unit -> 'a t * 'a handler
+
+  (** [get p] is the state of the resolved promise.
+      @raises [Failure] if not resolved *)
+  val get : 'a t -> 'a state
+
+  (** [is_resolved p] is true if [fulfill] or [reject] was called *)
+  val is_resolved : 'a t -> bool
+
+  (** [fulfill r v] fulfills the promise with [v].
+      @raises [Failure] if already resolved *)
+  val fulfill : 'a handler -> 'a -> unit
+
+  (** [reject r e] rejects the promise [p] with [e].
+      @raises [Failure] if already resolved *)
+  val reject : 'a handler -> exn -> unit
+end
+
 (** Events one can wait for (read data, pull from queues, ...)
     - [name] for debug printing
     - [priority] lower integers correspond to high priorities (as in Unix nice),
@@ -111,6 +146,9 @@ module On : sig
       The queue is emptied, useful to process the contents in batches *)
   val queue_all : ?priority:int -> ?name:string ->
     'b Queue.t -> ('b -> 'b list -> 'a) -> 'a Event.t
+
+  val promise : ?priority:int -> ?name:string ->
+    'b Promise.t -> ('b Promise.state -> 'a) -> 'a Event.t
 
 end
 
