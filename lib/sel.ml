@@ -26,8 +26,8 @@ let partition_events l =
         partition_events ((drop_event_type x e,e.priority) :: sys) queue task rest
     | { WithAttributes.it = QueueEvent x; _ } as e :: rest ->
         partition_events sys ((drop_event_type x e,e.priority) :: queue) task rest
-    | { WithAttributes.it = Task x; _ } as e :: rest ->
-        partition_events sys queue ((drop_event_type x e,e.priority) :: task) rest
+    | { WithAttributes.it = Task (u,x); _ } as e :: rest ->
+        partition_events sys queue ((Option.map (fun f x y -> f x.WithAttributes.it y.WithAttributes.it) u, drop_event_type x e, e.priority) :: task) rest
   in
     partition_events [] [] [] l
 
@@ -80,11 +80,11 @@ let add { system; queue; tasks; ready } l =
     { e with priority } in
   let l = List.map tick l in
   let new_sys, new_queue, new_tasks = partition_events l in
-  {
+  { 
     ready;
     system = Sorted.append system (Sorted.of_list new_sys);
-    queue = Sorted.append queue (Sorted.of_list new_queue);
-    tasks = Sorted.append tasks (Sorted.of_list new_tasks);
+    queue  = Sorted.append queue (Sorted.of_list new_queue);
+    tasks  = Sorted.append_uniq tasks new_tasks;
   }
   
 end

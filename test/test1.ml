@@ -271,6 +271,14 @@ let %test_unit "sel.event.http_cle.recurring.err" =
   [%test_eq: string option] ready (Some "4\n6.");
 ;;
 
+let %test_unit "sel.event.now.nodup" =
+  let e1 = now ~priority:1 ~undup:(=) 1 in
+  let e2 = now ~priority:1 1 in
+  let todo = Todo.add Todo.empty [e1;e2] in
+  let ready, todo = wait todo in
+  [%test_eq: bool] (Todo.is_empty todo) true;
+  [%test_eq: int list] ready [1];
+;;  
 
 let %test_unit "sel.event.now.order0" =
   let e1 = now ~priority:1 1 in

@@ -177,7 +177,7 @@ end
     ]}
 
 *)
-val now : ?priority:int -> ?name:string -> 'a -> 'a Event.t
+val now : ?priority:int -> ?name:string -> ?undup:('a -> 'a -> bool) -> 'a -> 'a Event.t
 
 (** Set of events being waited for *)
 module Todo : sig

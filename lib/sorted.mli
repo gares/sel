@@ -37,17 +37,19 @@ type 'a view =
 
 val look : 'a t -> 'a view
 val cons : 'a -> priority -> 'a t -> 'a t
-val cons_opt : ('a * priority) option -> 'a t -> 'a t
+(* val cons_opt : ('a * priority) option -> 'a t -> 'a t *)
 val nil : 'a t
 val is_nil : 'a t -> bool
 val length : 'a t -> int
 val filter : ('a -> bool) -> 'a t -> 'a t
 val for_all : ('a -> bool) -> 'a t -> bool
 val append : 'a t -> 'a t -> 'a t
+val append_uniq : 'a t -> (('a -> 'a -> bool) option * 'a * priority) list -> 'a t
 val concat : 'a t list -> 'a t
 val map_filter : ('a -> 'b option) -> 'a t -> 'b list
 val min : 'a t -> priority * 'a t
 val to_list : 'a t -> 'a list
+val iter_unsorted : ('a * priority -> ('a * priority) list -> unit) -> 'a t -> unit
 val of_list : ('a * priority) list -> 'a t
 val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 val partition : ('a -> bool) -> 'a t -> 'a t * 'a t
