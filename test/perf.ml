@@ -92,17 +92,17 @@ let%test_unit "sel.event.promise.thread.synchronization.perf" =
   Stdlib.Gc.compact ();
   let many = 30_000 in (* Loc of Pfff.v *)
 
-  let c = Condition.create () in
-  let m = Mutex.create () in
+  let c = Stdlib.Condition.create () in
+  let m = Stdlib.Mutex.create () in
   let x = ref None in
   let t = Thread.create (fun () ->
     let stop = ref false in
     while not !stop do
-      Mutex.lock m;
-      while match !x with None -> true | _ -> false do Condition.wait c m; done;
+      Stdlib.Mutex.lock m;
+      while match !x with None -> true | _ -> false do Stdlib.Condition.wait c m; done;
       match !x with
       | None -> assert false
-      | Some (p,i) -> Promise.fulfill p i; x := None; Condition.signal c; Mutex.unlock m; stop := i = many
+      | Some (p,i) -> Promise.fulfill p i; x := None; Stdlib.Condition.signal c; Stdlib.Mutex.unlock m; stop := i = many
     done) () in
 
   let x0 = Unix.gettimeofday () in
@@ -110,10 +110,10 @@ let%test_unit "sel.event.promise.thread.synchronization.perf" =
     let p, r = Promise.make () in
     let todo = Todo.add Todo.empty [On.promise p (fun e -> e)] in
 
-    Mutex.lock m;
-    while match !x with None -> false | _ -> true do Condition.wait c m; done;
+    Stdlib.Mutex.lock m;
+    while match !x with None -> false | _ -> true do Stdlib.Condition.wait c m; done;
     x := Some (r,i);
-    Condition.signal c; Mutex.unlock m;
+    Stdlib.Condition.signal c; Stdlib.Mutex.unlock m;
 
     let ready, todo = pop todo in
     let n =

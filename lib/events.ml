@@ -143,7 +143,7 @@ let map_queue_event f = function
 let map_task_event f x = f x
 
 let map f = function
-  | Task(u,e) -> Task (None, map_task_event f e)
+  | Task(_,e) -> Task (None, map_task_event f e)
   | SystemEvent e -> SystemEvent (map_system_event f e)
   | QueueEvent e -> QueueEvent(map_queue_event f e)  
   
