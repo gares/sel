@@ -174,6 +174,9 @@ end
             loop (Todo.add todo es)
       in
         loop (Todo.add Todo.empty [now (Fold((+),0,[1;2;3])); ...])
+
+      The [~undup] comparison test, when provided, is used to filter out
+      duplicates from the list of tasks.
     ]}
 
 *)
