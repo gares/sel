@@ -21,8 +21,6 @@ let cmp_priority { user = u1; insertion = i1} {user=u2; insertion=i2} =
   
 let max_priority = { user = max_int; insertion = max_int }
 
-let min_priority p1 p2 = if cmp_priority p1 p2 < 0 then p1 else p2
-
 let default_priority = { user = 0; insertion = 0 }
 
 let eq_user { user = u1; _} {user = u2; _} = u1 = u2
@@ -83,15 +81,18 @@ let min l =
   | [] -> max_priority, l
   | (_,p) :: _ -> p, l
 
+
 let cons x p l =
   match l.data with
   | (_,q) :: _ when l.sorted && lt_priority p q -> { sorted = true; data = (x,p) :: l.data }
   | _ -> { sorted =false; data = (x,p) :: l.data }
-let cons_opt = function
-  | Some(x,p) -> cons x p
-  | None -> fun x -> x
-
 let append l1 l2 = { sorted = false; data = l1.data @ l2.data }
+
+let rec append_uniq l1 = function
+  | [] -> l1
+  | (None,x,p) :: xs -> append_uniq (append l1 { sorted = false; data = [x,p] }) xs
+  | (Some f,x,p) :: xs -> append_uniq (append (filter (fun a -> not(f x a)) l1) { sorted = false; data = [x,p] }) xs
+
 let concat l = { sorted = false; data = List.concat (List.map (fun x -> x.data) l) }
   
 let of_list l = { sorted = false; data = l }

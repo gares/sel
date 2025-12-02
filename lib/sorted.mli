@@ -37,13 +37,13 @@ type 'a view =
 
 val look : 'a t -> 'a view
 val cons : 'a -> priority -> 'a t -> 'a t
-val cons_opt : ('a * priority) option -> 'a t -> 'a t
 val nil : 'a t
 val is_nil : 'a t -> bool
 val length : 'a t -> int
 val filter : ('a -> bool) -> 'a t -> 'a t
 val for_all : ('a -> bool) -> 'a t -> bool
 val append : 'a t -> 'a t -> 'a t
+val append_uniq : 'a t -> (('a -> 'a -> bool) option * 'a * priority) list -> 'a t
 val concat : 'a t list -> 'a t
 val map_filter : ('a -> 'b option) -> 'a t -> 'b list
 val min : 'a t -> priority * 'a t

@@ -128,7 +128,7 @@ let make_event ?(priority=0) ?name it =
 type 'a event_ =
   | SystemEvent of 'a system_event
   | QueueEvent of 'a queue_event
-  | Task of 'a task_event
+  | Task of ('a -> 'a -> bool) option * 'a task_event [@print fun f fmt (_,x) -> pp_task_event f fmt x]
   [@@deriving show]
 
 let map_system_event f = function
@@ -143,7 +143,7 @@ let map_queue_event f = function
 let map_task_event f x = f x
 
 let map f = function
-  | Task e -> Task (map_task_event f e)
+  | Task(_,e) -> Task (None, map_task_event f e)
   | SystemEvent e -> SystemEvent (map_system_event f e)
   | QueueEvent e -> QueueEvent(map_queue_event f e)  
   
@@ -248,8 +248,8 @@ let promise ?priority ?name (_,r as p : 'a Promise.t) (k : 'a Promise.state -> '
 
 end
 
-let now ?priority ?name task : 'a Event.t =
-  make_event ?priority ?name @@ Task task
+let now ?priority ?name ?undup task : 'a Event.t =
+  make_event ?priority ?name @@ Task (undup,task)
   
 let advance_queue _ _ = function
   | WaitQueue1(q1,_) as x when Queue.is_empty q1 -> (), No x

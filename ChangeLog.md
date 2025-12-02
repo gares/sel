@@ -1,3 +1,7 @@
+# v0.8.0 - 2/12/2025
+
+- New parameter `~undup` to `Sel.now` to avoid duplicate events
+
 # v0.7.0 - 13/06/2025
 
 - New API Sel.On.promise (fullfillment or rejection)
