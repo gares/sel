@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Events
+open Sel__events
 open Event
 
 let drop_event_type : 'b -> 'a WithAttributes.t -> 'b WithAttributes.t =
@@ -31,7 +31,10 @@ let partition_events l =
   in
     partition_events [] [] [] l
 
-let next_deadline delta = Unix.gettimeofday() +. delta
+let gettimeofday = Sel__backend.gettimeofday
+let select = Sel__backend.select
+
+let next_deadline delta = gettimeofday () +. delta
 
 module Todo = struct
 
@@ -112,10 +115,10 @@ type ('a,'b) ev_checker =
   'a WithAttributes.t Sorted.t -> 'b WithAttributes.t Sorted.t * 'a WithAttributes.t Sorted.t * Sorted.priority
 
 let file_descriptors_of l =
-  Sorted.map_filter (function { WithAttributes.it = ReadInProgress(fd,_); _ } -> Some fd | _ -> None) l
+  Sorted.map_filter (fun { WithAttributes.it = { System_event.fd; _ }; _ } -> fd) l
 
 let filter_file_descriptor fds = function
-  | { WithAttributes.it = ReadInProgress(fd,_); _ } -> List.mem fd fds
+  | { WithAttributes.it = { System_event.fd = Some fd; _ }; _ } -> List.mem fd fds
   | _ -> false
 
 (* For fairness reasons, even if there are immediately ready events we
@@ -129,7 +132,7 @@ let filter_file_descriptor fds = function
 let check_for_system_events min_prio_task_queue : ('a system_event,'a) ev_checker = fun waiting ->
   let rec check_for_system_events new_ready waiting_skipped min_prio_ready waiting =
     let fds = file_descriptors_of waiting in
-    let ready_fds, _, _ = Unix.select fds [] [] 0.0 in
+    let ready_fds = select fds ~timeout:0.0 in
     let new_ready_1, waiting, min_prio_ready_1 = pull_ready ~advance:advance_system ready_fds waiting in
     let new_ready = Sorted.append new_ready_1 new_ready in
     let min_prio_ready = Sorted.min_user min_prio_ready_1 min_prio_ready in
@@ -151,9 +154,9 @@ let check_for_queue_events : ('a queue_event,'a) ev_checker =
 (* This is blocking wait (modulo a deadline). We check for system events
    (io, process death) or a queue (in case some thread puts a token there). *)
 let rec wait_for_system_or_queue_events ~deadline (fds,sys) queue =
-  if Unix.gettimeofday () > deadline then Sorted.nil, Sorted.nil, sys, queue, Sorted.max_priority
+  if gettimeofday () > deadline then Sorted.nil, Sorted.nil, sys, queue, Sorted.max_priority
   else
-    let ready_fds, _, _ = Unix.select fds [] [] 0.1 in
+    let ready_fds = select fds ~timeout:0.1 in
     let ready_sys, waiting_sys, min_prio_sys = pull_ready ~advance:advance_system ready_fds sys in
     let ready_queue, waiting_queue, min_prio_queue = pull_ready ~advance:advance_queue () queue in
     if not(Sorted.is_nil ready_sys) || not(Sorted.is_nil ready_queue)
@@ -233,6 +236,9 @@ let pop_timeout ~stop_after_being_idle_for:delta l =
   let deadline = next_deadline delta in
   pop_return @@ wait ~deadline l
 
+(* the deadline is in the past, hence we never block *)
+let pop_ready l = pop_return @@ wait ~deadline:neg_infinity l
+
 let wait_return (l,todo) =
   l |> List.map (fun x -> x.WithAttributes.it), todo
 
@@ -240,6 +246,13 @@ let wait_timeout ~stop_after_being_idle_for:delta l =
   let deadline = next_deadline delta in
   wait_return @@ wait ~deadline l
 
+let wait_ready l = wait_return @@ wait ~deadline:neg_infinity l
+
 let wait l = wait_return @@ wait l
 
-include Events
+include Sel__events
+
+module System_event = struct
+  include System_event
+  let event ?priority ?name e = make_event ?priority ?name @@ SystemEvent e
+end

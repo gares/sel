@@ -12,7 +12,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Simple event library *)
+(** Simple event library, core part.
+
+    This library does not depend on [Unix] and can be used, for example,
+    in a JavaScript or WebAssembly program.
+    The [sel.unix] library (module {!Sel_unix}) extends it with events on
+    Unix file descriptors and processes and provides a backend based on
+    [Unix.select]. The [sel.js] library (module {!Sel_js}) provides a
+    backend and a driver for programs compiled with js_of_ocaml or
+    wasm_of_ocaml.
+
+    With [sel.js] the blocking APIs ({!val:pop}, {!val:wait}, ...) fail
+    when they would have to block: use the non blocking ones
+    ({!val:pop_ready}, {!val:wait_ready}) or {!Sel_js.run} instead. *)
 
 (** The main loop goes like this 
 
@@ -23,9 +35,7 @@
       | Echo of string
 
     let echo : top_event Event.t =
-      On.line Unix.stdin (function
-        | Ok s -> Echo s
-        | Error _ -> Echo "error")
+      On.queue input_queue (fun s -> Echo s)
 
     let handle_event = function
       | NotForMe e ->
@@ -66,6 +76,31 @@
 
   (** a cancelled event is automatically removed from the todo set *)
   val cancel : cancellation_handle -> unit
+
+end
+
+(** Extension point for system events, for example input on a file descriptor.
+    The [sel.unix] library uses it to implement the Unix specific events. *)
+module System_event : sig
+
+  (** What a system event waits for, e.g. a Unix file descriptor to be
+      readable: the implementations of [sel] extend it with their own *)
+  type file_descr = Sel__fd.t = ..
+
+  type ('a,'b) step =
+    | Yes of 'a      (** the event is ready, with this value *)
+    | No  of 'b      (** the event is not ready *)
+    | Advanced of 'b (** the event progressed but it is not ready yet *)
+
+  (** A system event. [advance] is called if [fd] is [None] (the event is
+      polled) or if [fd] is reported as ready by the backend. *)
+  type 'a t = {
+    fd : file_descr option;
+    advance : unit -> ('a, 'a t) step;
+    descr : string;
+  }
+
+  val event : ?priority:int -> ?name:string -> 'a t -> 'a Event.t
 
 end
 
@@ -112,26 +147,6 @@ end
 module On : sig
 
   type 'a res = ('a,exn) result
-
-  (** a line, terminated by ['\n'] *)
-  val line : ?priority:int -> ?name:string ->
-    Unix.file_descr -> (string res -> 'a) -> 'a Event.t
-
-  (** bytes *)
-  val bytes :  ?priority:int -> ?name:string ->
-    Unix.file_descr -> int -> (Bytes.t res -> 'a) -> 'a Event.t
-
-  (** termination of a process *)
-  val death_of : ?priority:int -> ?name:string ->
-    pid:int -> (Unix.process_status -> 'a) -> 'a Event.t
-
-  (** any value (not type safe, uses [Marshall]) *)
-  val ocaml_value : ?priority:int -> ?name:string ->
-    Unix.file_descr -> ('b res -> 'a) -> 'a Event.t
-
-  (** HTTP Content Length encoded data *)
-  val httpcle : ?priority:int -> ?name:string ->
-    Unix.file_descr -> (Bytes.t res -> 'a) -> 'a Event.t
 
   (** Synchronization events between two components (e.g. a worker pool and a
       task queue) and an event (e.g. starting a worker) *)
@@ -205,6 +220,13 @@ module Todo : sig
   val add : 'a t -> 'a Event.t list -> 'a t
 
 end
+
+(** [pop_ready todo] returns an event if one is ready, never blocks. *)
+val pop_ready : 'a Todo.t -> 'a option * 'a Todo.t
+
+(** [wait_ready todo] returns all ready events with the lowest priority,
+    never blocks. *)
+val wait_ready : 'a Todo.t -> 'a list * 'a Todo.t
 
 (** wait for one event. If more are ready, return the one with higher priority.
     @raise Failure when there is nothing left to do *)
