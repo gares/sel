@@ -1,0 +1,5 @@
+(test
+ (name test_js)
+ (modes js wasm)
+ (enabled_if %{lib-available:js_of_ocaml})
+ (libraries sel sel.js js_of_ocaml))

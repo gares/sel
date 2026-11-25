@@ -1,0 +1,9 @@
+(library
+ (name sel_unix)
+ (implements sel)
+ (libraries unix)
+ (modules sel_unix sel__unix_fd sel__backend)
+ (private_modules sel__unix_fd)
+ (public_name sel.unix)
+ (instrumentation (backend bisect_ppx))
+ )

@@ -34,7 +34,7 @@ let pipe () =
 let %test_unit "sel.event.http_cle.perf" =
   Stdlib.Gc.compact ();
   let read, write = pipe () in
-  let e = On.httpcle read b2s in
+  let e = Sel_unix.On.httpcle read b2s in
   let t0 = Unix.gettimeofday () in
   let n = 99999 in
   for _i = 1 to n do

@@ -34,7 +34,7 @@ Dispatching is not automatic, it's your `handle_event` that does it.
     | Echo of string
 
   let echo : top_event Sel.Event.t =
-    Sel.On.line Unix.stdin (function
+    Sel_unix.On.line Unix.stdin (function
       | Ok s -> Echo s
       | Error _ -> exit 1)
       
@@ -65,7 +65,14 @@ That is all, for the good and the bad. One has to write some boring code, like
 injecting the events of the other component into the `NotForMe` event, so that
 dispatching can pass the ball correctly.
 
-SEL provides a few `Sel.On.*` APIs to create events on which one can wait.
+`sel` is a virtual library with two implementations: a program picks one by
+linking it:
+- `sel.unix`, the default, has a backend based on `Unix.select`, and its
+  module `Sel_unix` adds events on Unix file descriptors and processes.
+- the optional `sel.js` is for programs compiled with js_of_ocaml or
+  wasm_of_ocaml, see [SEL in JavaScript](#sel-in-javascript).
+
+SEL provides a few `Sel.On.*` and `Sel_unix.On.*` APIs to create events on which one can wait.
 For example the death of a process, or an HTTP Content-Length encoded request,
 or some item in a Queue, or some marshaled OCaml value.
 All these APIs take a function to inject the actual data that comes with the
@@ -91,9 +98,54 @@ SEL is just some sugar atop `Unix.select`.
 
 #### Trivia
 
-SEL was written by Enrico Tassi for the [VSCoq 2 language-server](https://github.com/coq-community/vscoq).
+SEL was written by Enrico Tassi for the [VSRocq 2 language-server](https://github.com/rocq-prover/vsrocq).
 SEL is both an acronym and [a joke](https://en.wikipedia.org/wiki/Salting_a_bird%27s_tail).
 SEL is released under the terms of the MIT license.
+
+### SEL in JavaScript
+
+In JavaScript (a browser, a Web Worker, node) there is no `Unix.select` and
+one cannot block: data comes from callbacks run by the JavaScript event loop,
+and the event loop runs only when the OCaml code returns. Hence the `loop`
+above, which blocks in `Sel.pop`, cannot be used.
+
+The `sel.js` implementation fails if `Sel.pop` or `Sel.wait` would have to
+block, and its module `Sel_js` provides a driver that runs the loop for you,
+from the JavaScript event loop:
+
+```ocaml
+  let inbox : string Queue.t = Queue.create ()
+
+  let echo : top_event Sel.Event.t =
+    Sel.On.queue inbox (fun s -> Echo s)
+
+  let main () =
+    Sel_js.run ~handle_event ~init:(Sel.Todo.add Sel.Todo.empty [echo; ...]) ()
+
+  (* to be called by JavaScript when a message arrives *)
+  let on_message s =
+    Queue.push s inbox;
+    Sel_js.wakeup ()
+```
+
+`Sel_js.run` returns immediately, and can be called only once. The driver
+keeps its own todo, initially `~init`, and adds to it the events returned by
+`handle_event`. The ready events are handled by functions
+scheduled with `setTimeout`: each one handles ready events, one after the
+other, and gives the control back to the JavaScript event loop, so that new
+data can arrive, when no event is ready or when more than `~budget` seconds
+have passed. The time is checked between two events, the driver cannot
+interrupt `handle_event`: a long computation blocks the JavaScript event
+loop, unless it is split in steps with `Sel.now` as explained above.
+
+The events one can wait for are the ones of the `sel` library: queues,
+promises and `Sel.now`. JavaScript callbacks feed a queue and call
+`Sel_js.wakeup ()`, or resolve a promise (the backend wakes up the driver).
+When no event is ready the driver sleeps until it is woken up, or `~poll`
+seconds passed.
+
+If you prefer to write the loop yourself, use the non blocking `Sel.pop_ready`
+and `Sel.wait_ready` from a function you call from JavaScript.
 
 ### Why SEL?
 
