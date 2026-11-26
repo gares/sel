@@ -8,6 +8,7 @@ jobs:
 
   opam:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         ocaml-compiler: [4.14.x, 5.3.x]
@@ -20,6 +21,36 @@ jobs:
       uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+    - name: Use Node.js (for the js/wasm tests)
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install binaryen (Windows has no system package for it)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $v = "version_133"
+        Invoke-WebRequest -Uri "https://github.com/WebAssembly/binaryen/releases/download/$v/binaryen-$v-x86_64-windows.tar.gz" -OutFile binaryen.tar.gz
+        # not the Cygwin tar on PATH, it does not understand C:\ paths
+        & "$env:SystemRoot\System32\tar.exe" -xzf binaryen.tar.gz -C $env:RUNNER_TEMP
+        Add-Content -Path $env:GITHUB_PATH -Value "$env:RUNNER_TEMP\binaryen-$v\bin"
+
+    # Install the dependencies of SEL first: otherwise installing them
+    # (e.g. ocamlfind) triggers a recompilation of js/wasm_of_ocaml while
+    # SEL is being built, and the wasm_of_ocaml binary may be missing
+    - name: Install dependencies
+      env:
+        OPAMYES: true
+      run: |
+        opam install . --deps-only --with-doc --with-test
+
+    - name: Install optional dependencies
+      env:
+        OPAMYES: true
+      run: |
+        opam install js_of_ocaml wasm_of_ocaml-compiler
 
     - name: Install SEL
       env:
