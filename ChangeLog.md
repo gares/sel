@@ -1,32 +1,23 @@
-# Unreleased
+# v0.9.0 - 26/11/2026
 
-- **Breaking**: `sel` is a virtual library, with two implementations: a
-  program picks one by linking it, and gets `sel.unix` if it does not.
+- `sel` is a virtual library, with two implementations: `sel.unix` and `sel.js`.
   Libraries only creating events (queues, promises, `Sel.now`) can depend
   on `sel` and work with both. They are all in the `sel` opam package.
-  Modules are not wrapped anymore: `sel` provides the module `Sel`, and its
-  internal modules are named `sel__*`
   - `sel.unix`, the default implementation, has a backend based on
-    `Unix.select`, and its module `Sel_unix` the Unix specific events, that
-    were in `Sel.On`: `Sel_unix.On.line`, `Sel_unix.On.bytes`,
-    `Sel_unix.On.httpcle`, `Sel_unix.On.ocaml_value`,
-    `Sel_unix.On.death_of`. A native program only needs to replace
-    `Sel.On.line` with `Sel_unix.On.line` (and so on)
+    `Unix.select`, and its module `Sel_unix` contains events `Sel_unix.On.line`,
+    `Sel_unix.On.bytes`, `Sel_unix.On.httpcle`, `Sel_unix.On.ocaml_value`,
+    `Sel_unix.On.death_of`.
   - the optional `sel.js`, built if `js_of_ocaml` is installed, is for
-    programs compiled with js_of_ocaml or wasm_of_ocaml. Its backend never
-    blocks (`Sel.pop` and `Sel.wait` fail if no event is ready), uses
-    `Date.now` as a clock and wakes up the driver when a promise is
-    resolved. Its module `Sel_js` provides a driver,
+    programs compiled with js_of_ocaml or wasm_of_ocaml.
+    Its module `Sel_js` provides a driver,
     `Sel_js.run ~handle_event ~init ()`, that handles the ready events from
     the JavaScript event loop, and adds the events returned by
-    `handle_event` to its todo. There is one driver: `run` fails if called
-    twice. `Sel_js.wakeup` is to be called when a JavaScript callback
-    feeds a queue
+    `handle_event` to its todo. `Sel_js.wakeup` is to be called when a
+    JavaScript callback unblocks an event (eg feeds a queue)
 - New non blocking APIs `pop_ready` and `wait_ready`, to integrate `sel` in
   an external event loop
-- New extension point `Sel.System_event` to implement system events
-- Promises do not use a pipe anymore, the Unix backend uses a self pipe to
-  wake up `select` when a promise is resolved
+- Promises do not use a pipe-per-promise anymore, the Unix backend uses a self
+  pipe to wake up `select` when a promise is resolved
 - Requires OCaml >= 4.12 (Atomic) and dune >= 3.17
 
 # v0.8.0 - 2/12/2025
