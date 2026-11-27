@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Sel
+include Sel_core
 type 'a res = 'a On.res
 
 (* Events in progress *)
@@ -90,6 +90,8 @@ let rec wait_process pid k : 'a System_event.t =
       else System_event.Yes (k code)) }
 
 module On = struct
+
+include Sel_core.On
 
 let line ?priority ?name fd k : 'a Event.t =
   System_event.event ?priority ?name @@ read_in_progress fd (one_line () -- finish_with k)

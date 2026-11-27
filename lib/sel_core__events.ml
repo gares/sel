@@ -14,12 +14,12 @@
 
 type 'a res = ('a,exn) result
 
-module Sorted = Sel__sorted
+module Sorted = Sel_core__sorted
 
 (* System events are provided by extensions (e.g. the Unix one) *)
 module System_event = struct
 
-  type file_descr = Sel__fd.t = ..
+  type file_descr = Sel_core__fd.t = ..
 
   type ('a,'b) step =
     | Yes of 'a
@@ -64,7 +64,7 @@ module Promise = struct
   type 'a handler = 'a t
 
   let resolve p s =
-    if Atomic.compare_and_set p None (Some s) then Sel__backend.notify ()
+    if Atomic.compare_and_set p None (Some s) then Sel_core__backend.notify ()
     else raise @@ Failure "cannot resolve a promise twice"
 
   let make () : 'a t * 'a handler =

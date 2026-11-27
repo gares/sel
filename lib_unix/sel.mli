@@ -12,11 +12,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Simple event library, Unix part
+(** Simple event library
 
-    The [sel.unix] library implements {!Sel} with a backend based on
+    The [sel] library implements {!Sel_core} with a backend based on
     [Unix.select] (it is the default implementation), and this module
-    complements {!Sel} with events on Unix file descriptors and processes.
+    extends {!Sel_core} with events on Unix file descriptors and processes
+    (see {!On}).
+
+    Libraries which only create events (queues, promises, {!Sel_core.now})
+    and that should also work in JavaScript can depend on [sel.core] and use
+    {!Sel_core} instead: the types of the two modules are the same.
 
     The main loop goes like this
 
@@ -27,7 +32,7 @@
       | Echo of string
 
     let echo : top_event Sel.Event.t =
-      Sel_unix.On.line Unix.stdin (function
+      Sel.On.line Unix.stdin (function
         | Ok s -> Echo s
         | Error _ -> Echo "error")
 
@@ -51,31 +56,37 @@
 
  *)
 
-(** Unix events one can wait for (read data, death of a process, ...)
+include module type of struct include Sel_core end
+  with module On := Sel_core.On
+
+(** Events one can wait for (read data, pull from queues, death of a
+    process, ...)
     - [name] for debug printing
     - [priority] lower integers correspond to high priorities (as in Unix nice),
       default is 0
 *)
 module On : sig
 
+  include module type of struct include Sel_core.On end
+
   (** a line, terminated by ['\n'] *)
   val line : ?priority:int -> ?name:string ->
-    Unix.file_descr -> (string Sel.On.res -> 'a) -> 'a Sel.Event.t
+    Unix.file_descr -> (string res -> 'a) -> 'a Event.t
 
   (** bytes *)
   val bytes :  ?priority:int -> ?name:string ->
-    Unix.file_descr -> int -> (Bytes.t Sel.On.res -> 'a) -> 'a Sel.Event.t
+    Unix.file_descr -> int -> (Bytes.t res -> 'a) -> 'a Event.t
 
   (** termination of a process *)
   val death_of : ?priority:int -> ?name:string ->
-    pid:int -> (Unix.process_status -> 'a) -> 'a Sel.Event.t
+    pid:int -> (Unix.process_status -> 'a) -> 'a Event.t
 
   (** any value (not type safe, uses [Marshall]) *)
   val ocaml_value : ?priority:int -> ?name:string ->
-    Unix.file_descr -> ('b Sel.On.res -> 'a) -> 'a Sel.Event.t
+    Unix.file_descr -> ('b res -> 'a) -> 'a Event.t
 
   (** HTTP Content Length encoded data *)
   val httpcle : ?priority:int -> ?name:string ->
-    Unix.file_descr -> (Bytes.t Sel.On.res -> 'a) -> 'a Sel.Event.t
+    Unix.file_descr -> (Bytes.t res -> 'a) -> 'a Event.t
 
 end

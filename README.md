@@ -34,7 +34,7 @@ Dispatching is not automatic, it's your `handle_event` that does it.
     | Echo of string
 
   let echo : top_event Sel.Event.t =
-    Sel_unix.On.line Unix.stdin (function
+    Sel.On.line Unix.stdin (function
       | Ok s -> Echo s
       | Error _ -> exit 1)
       
@@ -65,14 +65,19 @@ That is all, for the good and the bad. One has to write some boring code, like
 injecting the events of the other component into the `NotForMe` event, so that
 dispatching can pass the ball correctly.
 
-`sel` is a virtual library with two implementations: a program picks one by
-linking it:
-- `sel.unix`, the default, has a backend based on `Unix.select`, and its
-  module `Sel_unix` adds events on Unix file descriptors and processes.
+The `sel` library, module `Sel`, has a backend based on `Unix.select` and
+provides events on Unix file descriptors and processes. Its system agnostic
+part is the virtual library `sel.core`, module `Sel_core`, with two
+implementations: a program picks one by linking it:
+- `sel`, the default, described above;
 - the optional `sel.js` is for programs compiled with js_of_ocaml or
   wasm_of_ocaml, see [SEL in JavaScript](#sel-in-javascript).
 
-SEL provides a few `Sel.On.*` and `Sel_unix.On.*` APIs to create events on which one can wait.
+Libraries only creating events (queues, promises, `Sel_core.now`) can depend on
+`sel.core` and work with both. `Sel` includes `Sel_core` (the types are the
+same), hence such libraries can be used in programs depending on `sel`.
+
+SEL provides a few `Sel.On.*` APIs to create events on which one can wait.
 For example the death of a process, or an HTTP Content-Length encoded request,
 or some item in a Queue, or some marshaled OCaml value.
 All these APIs take a function to inject the actual data that comes with the
@@ -109,18 +114,21 @@ one cannot block: data comes from callbacks run by the JavaScript event loop,
 and the event loop runs only when the OCaml code returns. Hence the `loop`
 above, which blocks in `Sel.pop`, cannot be used.
 
-The `sel.js` implementation fails if `Sel.pop` or `Sel.wait` would have to
-block, and its module `Sel_js` provides a driver that runs the loop for you,
-from the JavaScript event loop:
+The `sel.js` library implements `sel.core`: a program using it depends on
+`sel.core` and `sel.js`, but not on `sel`, and uses `Sel_core` in place of
+`Sel`. It fails if `Sel_core.pop` or `Sel_core.wait` would have to block,
+and its module `Sel_js` provides a driver that runs the loop for you, from
+the JavaScript event loop:
 
 ```ocaml
   let inbox : string Queue.t = Queue.create ()
 
-  let echo : top_event Sel.Event.t =
-    Sel.On.queue inbox (fun s -> Echo s)
+  let echo : top_event Sel_core.Event.t =
+    Sel_core.On.queue inbox (fun s -> Echo s)
 
   let main () =
-    Sel_js.run ~handle_event ~init:(Sel.Todo.add Sel.Todo.empty [echo; ...]) ()
+    Sel_js.run ~handle_event
+      ~init:(Sel_core.Todo.add Sel_core.Todo.empty [echo; ...]) ()
 
   (* to be called by JavaScript when a message arrives *)
   let on_message s =
@@ -136,16 +144,16 @@ other, and gives the control back to the JavaScript event loop, so that new
 data can arrive, when no event is ready or when more than `~budget` seconds
 have passed. The time is checked between two events, the driver cannot
 interrupt `handle_event`: a long computation blocks the JavaScript event
-loop, unless it is split in steps with `Sel.now` as explained above.
+loop, unless it is split in steps with `Sel_core.now` as explained above.
 
-The events one can wait for are the ones of the `sel` library: queues,
-promises and `Sel.now`. JavaScript callbacks feed a queue and call
+The events one can wait for are the ones of the `sel.core` library: queues,
+promises and `Sel_core.now`. JavaScript callbacks feed a queue and call
 `Sel_js.wakeup ()`, or resolve a promise (the backend wakes up the driver).
 When no event is ready the driver sleeps until it is woken up, or `~poll`
 seconds passed.
 
-If you prefer to write the loop yourself, use the non blocking `Sel.pop_ready`
-and `Sel.wait_ready` from a function you call from JavaScript.
+If you prefer to write the loop yourself, use the non blocking
+`Sel_core.pop_ready` and `Sel_core.wait_ready` from a function you call from JavaScript.
 
 ### Why SEL?
 

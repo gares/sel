@@ -12,7 +12,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Sel.System_event.file_descr: it is defined here, and not in Sel, since
-   the backend uses it, and Sel uses the backend. The implementations of sel
-   extend it in their private modules *)
-type t = ..
+
+(* The JavaScript backend: one cannot block, there are no file descriptors,
+   and resolving a promise wakes up the driver of Sel_js.run *)
+let select _ ~timeout =
+  if timeout > 0. then
+    failwith "Sel_core: cannot block in JavaScript, use Sel_js.run or Sel_core.pop_ready";
+  []
+
+let gettimeofday = Sel_js__driver.now
+let notify = Sel_js__driver.wakeup

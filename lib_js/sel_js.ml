@@ -13,8 +13,8 @@
 (**************************************************************************)
 
 
-let wakeup = Sel__js_driver.wakeup
+let wakeup = Sel_js__driver.wakeup
 
 let run ?budget ?poll ~handle_event ~init () =
-  Sel__js_driver.run ~pop_ready:Sel.pop_ready ~add:Sel.Todo.add
+  Sel_js__driver.run ~pop_ready:Sel_core.pop_ready ~add:Sel_core.Todo.add
     ?budget ?poll ~handle_event ~init ()

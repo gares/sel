@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 open Base
-open Sel
+open Sel_core
 
 (* drain all ready events, never blocking *)
 let rec drain acc todo =

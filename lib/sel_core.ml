@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Sel__events
+open Sel_core__events
 open Event
 
 let drop_event_type : 'b -> 'a WithAttributes.t -> 'b WithAttributes.t =
@@ -31,8 +31,8 @@ let partition_events l =
   in
     partition_events [] [] [] l
 
-let gettimeofday = Sel__backend.gettimeofday
-let select = Sel__backend.select
+let gettimeofday = Sel_core__backend.gettimeofday
+let select = Sel_core__backend.select
 
 let next_deadline delta = gettimeofday () +. delta
 
@@ -250,7 +250,7 @@ let wait_ready l = wait_return @@ wait ~deadline:neg_infinity l
 
 let wait l = wait_return @@ wait l
 
-include Sel__events
+include Sel_core__events
 
 module System_event = struct
   include System_event

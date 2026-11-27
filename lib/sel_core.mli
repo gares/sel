@@ -14,13 +14,17 @@
 
 (** Simple event library, core part.
 
-    This library does not depend on [Unix] and can be used, for example,
-    in a JavaScript or WebAssembly program.
-    The [sel.unix] library (module {!Sel_unix}) extends it with events on
-    Unix file descriptors and processes and provides a backend based on
-    [Unix.select]. The [sel.js] library (module {!Sel_js}) provides a
-    backend and a driver for programs compiled with js_of_ocaml or
-    wasm_of_ocaml.
+    [sel.core] is a virtual library, it does not depend on [Unix] and can
+    be used, for example, in a JavaScript or WebAssembly program.
+    A program picks an implementation by linking it:
+    - the [sel] library (module {!Sel}), the default, provides a backend
+      based on [Unix.select] and extends this API with events on Unix file
+      descriptors and processes;
+    - the [sel.js] library (module {!Sel_js}) provides a backend and a
+      driver for programs compiled with js_of_ocaml or wasm_of_ocaml.
+
+    Libraries only creating events (queues, promises, {!val:now}) can depend
+    on [sel.core] and work with both.
 
     With [sel.js] the blocking APIs ({!val:pop}, {!val:wait}, ...) fail
     when they would have to block: use the non blocking ones
@@ -80,12 +84,12 @@
 end
 
 (** Extension point for system events, for example input on a file descriptor.
-    The [sel.unix] library uses it to implement the Unix specific events. *)
+    The [sel] library uses it to implement the Unix specific events. *)
 module System_event : sig
 
   (** What a system event waits for, e.g. a Unix file descriptor to be
       readable: the implementations of [sel] extend it with their own *)
-  type file_descr = Sel__fd.t = ..
+  type file_descr = Sel_core__fd.t = ..
 
   type ('a,'b) step =
     | Yes of 'a      (** the event is ready, with this value *)
