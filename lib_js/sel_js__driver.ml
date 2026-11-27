@@ -14,8 +14,8 @@
 
 
 (* The driver of Sel_js.run. It is not in Sel_js since the backend wakes it
-   up, and Sel_js depends on Sel, which depends on the backend: for the same
-   reason [run] takes [Sel.pop_ready] and [Sel.Todo.add] as arguments *)
+   up, and Sel_js depends on Sel_core, which depends on the backend: for the same
+   reason [run] takes [Sel_core.pop_ready] and [Sel_core.Todo.add] as arguments *)
 
 open Js_of_ocaml
 

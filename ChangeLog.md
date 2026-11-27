@@ -1,3 +1,16 @@
+# v0.10.0 - 27/11/2026
+
+- Restore the API of v0.8.0, broken by v0.9.0: the `sel` library is again
+  the Unix one, and its module `Sel` has all the events, including
+  `Sel.On.line`, `Sel.On.bytes`, `Sel.On.httpcle`, `Sel.On.ocaml_value` and
+  `Sel.On.death_of`.
+- The system agnostic part is the virtual library `sel.core`, module
+  `Sel_core`, implemented by `sel` (the default) and `sel.js`. `Sel` includes
+  `Sel_core`, the types are the same. Libraries only creating events can
+  depend on `sel.core` and work with both implementations.
+- The `sel.unix` library and the `Sel_unix` module are gone, use `sel` and
+  `Sel`. Programs using `sel.js` use `Sel_core` in place of `Sel`.
+
 # v0.9.0 - 26/11/2026
 
 - `sel` is a virtual library, with two implementations: `sel.unix` and `sel.js`.

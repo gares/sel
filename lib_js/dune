@@ -1,10 +1,10 @@
 (library
  (name sel_js)
- (implements sel)
+ (implements sel_core)
  (public_name sel.js)
  (optional)
  (libraries js_of_ocaml)
- (modules sel_js sel__js_driver sel__backend)
- (private_modules sel__js_driver)
+ (modules sel_js sel_js__driver sel_core__backend)
+ (private_modules sel_js__driver)
  (instrumentation (backend bisect_ppx))
  )

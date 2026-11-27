@@ -99,7 +99,7 @@ let %test_unit "sel.wait.pop" =
 (* bytes n waits until n bytes are read *)
 let %test_unit "sel.event.bytes" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [Sel_unix.On.bytes read 3 b2s] in
+  let todo = Todo.add Todo.empty [On.bytes read 3 b2s] in
   (* nothing to read *)
   let _ready, todo = wait_timeout todo in
   (* something to read but not enough *)
@@ -117,7 +117,7 @@ let %test_unit "sel.event.bytes" =
 (* internal buffer is reset *)
 let %test_unit "sel.event.bytes.recurring" =
   let read, write = pipe () in
-  let e = Sel_unix.On.bytes read 3 b2s in
+  let e = On.bytes read 3 b2s in
   let todo = Todo.add Todo.empty [e] in
   write "123";
 let ready, todo = pop_opt todo in
@@ -194,7 +194,7 @@ let%test_unit "sel.event.promise" =
 (* line event waits for \n and does not eat more chars *)
 let %test_unit "sel.event.line" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [Sel_unix.On.line read s2s] in
+  let todo = Todo.add Todo.empty [On.line read s2s] in
   let _ready, todo = wait_timeout todo in
   write "123";
   let _ready, todo = wait_timeout todo in
@@ -208,7 +208,7 @@ let %test_unit "sel.event.line" =
 (* line internal buffer is not pulluted by previous run *)
 let %test_unit "sel.event.line.recurring" =
   let read, write = pipe () in
-  let e = Sel_unix.On.line read s2s in
+  let e = On.line read s2s in
   let todo = Todo.add Todo.empty [e] in
   write "123\n";
   let ready, todo = pop_opt todo in
@@ -223,7 +223,7 @@ let %test_unit "sel.event.line.recurring" =
 
 let %test_unit "sel.event.http_cle" =
   let read, write = pipe () in
-  let todo = Todo.add Todo.empty [Sel_unix.On.httpcle read b2s ] in
+  let todo = Todo.add Todo.empty [On.httpcle read b2s ] in
   write "content-Length: 4\n\n1\n3.";
   let ready, todo = pop_opt todo in
   [%test_eq: bool] (Todo.is_empty todo) true;
@@ -232,7 +232,7 @@ let %test_unit "sel.event.http_cle" =
 
 let %test_unit "sel.event.http_cle.recurring" =
   let read, write = pipe () in
-  let e = Sel_unix.On.httpcle read b2s in
+  let e = On.httpcle read b2s in
   let todo = Todo.add Todo.empty [e] in
   write "content-Length: 4\n\n1\n3.";
   let ready, todo = pop_opt todo in
@@ -247,7 +247,7 @@ let %test_unit "sel.event.http_cle.recurring" =
 
 let %test_unit "sel.event.http_cle.recurring.err" =
   let read, write = pipe () in
-  let e = Sel_unix.On.httpcle read b2s in
+  let e = On.httpcle read b2s in
   let todo = Todo.add Todo.empty [e] in
   write "content-Length: \n";
   let ready, todo = pop_opt todo in

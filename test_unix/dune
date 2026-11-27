@@ -1,6 +1,6 @@
 (library
  (name sel_unix_tests)
- (libraries base stdio sel sel.unix str threads unix)
+ (libraries base stdio sel str threads unix)
  (preprocess
    (pps ppx_sexp_conv ppx_inline_test ppx_assert))
  (inline_tests)

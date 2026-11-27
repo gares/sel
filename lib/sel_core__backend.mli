@@ -12,13 +12,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* The backend of Sel_core, internal: sel.core is a virtual library and this
+   is its virtual module, implemented by sel (based on Unix.select) and sel.js
+   (for js_of_ocaml and wasm_of_ocaml). A program picks one by linking it,
+   the default is sel. Dune does not allow a virtual module to be
+   private, hence its name (and the odoc stop below). *)
 
-(* The JavaScript backend: one cannot block, there are no file descriptors,
-   and resolving a promise wakes up the driver of Sel_js.run *)
-let select _ ~timeout =
-  if timeout > 0. then
-    failwith "Sel: cannot block in JavaScript, use Sel_js.run or Sel.pop_ready";
-  []
+(**/**)
 
-let gettimeofday = Sel__js_driver.now
-let notify = Sel__js_driver.wakeup
+(** [select l ~timeout] returns the ready file descriptors among [l],
+    waiting at most [timeout] seconds *)
+val select : Sel_core__fd.t list -> timeout:float -> Sel_core__fd.t list
+
+(** the current time, in seconds *)
+val gettimeofday : unit -> float
+
+(** called (possibly by another thread) when a promise is resolved: it
+    should interrupt any [select] running *)
+val notify : unit -> unit
